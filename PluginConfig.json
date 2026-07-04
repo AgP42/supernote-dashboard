@@ -1,0 +1,11 @@
+{
+  "name": "dashboard",
+  "pluginKey": "dashboard",
+  "pluginID": "dsh4b0ardplg9x2k",
+  "jsMainPath": "index",
+  "iconPath": "assets/icon.png",
+  "desc": "Configurable dashboard: shortcuts, stars, keywords and app launchers, reachable from a floating bubble.",
+  "author": "AgP42",
+  "versionName": "0.9.3",
+  "versionCode": "14"
+}
