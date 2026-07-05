@@ -1,6 +1,7 @@
 # Dashboard for Supernote
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20%E2%98%95-black)](https://ko-fi.com/agp42)
 
 A configurable, always‑available **dashboard** for Supernote e‑ink devices. A draggable **⊕ bubble**
 floats over everything; tap it to open a dashboard you compose yourself from **shortcuts**,
@@ -24,7 +25,8 @@ system).
 
 ## Install
 
-1. Download `dashboard.snplg` from the [Releases](../../releases) (or build it — see below).
+1. Download **[`dist/dashboard.snplg`](dist/dashboard.snplg)** (or from the [Releases](../../releases),
+   or build it — see below).
 2. Copy it into the **`MyStyle`** folder on your Supernote.
 3. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.
 
@@ -55,6 +57,10 @@ Official Supernote developer docs (the source of truth): https://docs.supernote.
 - The bundled Claude Code skill is adapted from [Laumss/Inkling](https://github.com/Laumss/Inkling)
   (MIT).
 - Research informed by the Supernote plugin community (see FINDINGS.md).
+
+## Support
+
+If this is useful to you, you can support it on [Ko‑fi](https://ko-fi.com/agp42) ☕ — thank you!
 
 ## License
 

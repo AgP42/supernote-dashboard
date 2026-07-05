@@ -1,3 +1,1 @@
-# GitHub "Sponsor" button. A PayPal link works via the `custom` key — e.g.:
-# custom: ["https://paypal.me/YOURHANDLE"]
-# (Ko-fi, which pays out via PayPal without Stripe, would be: ko_fi: yourhandle)
+ko_fi: agp42
