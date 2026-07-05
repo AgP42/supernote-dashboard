@@ -10,7 +10,7 @@ floats over everything; tap it to open a dashboard you compose yourself from **s
 Works on **A5X**, **A5X2 (Manta)** and **Nomad** (Supernote developer/beta firmware with the plugin
 system).
 
-<!-- Add a screenshot here once available: docs/screenshots/dashboard.png -->
+![The dashboard on a Supernote Manta](docs/screenshots/dashboard.png)
 
 ## Features
 

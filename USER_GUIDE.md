@@ -4,6 +4,8 @@ Dashboard turns a floating **⊕ bubble** into a launcher for your Supernote: on
 dashboard you compose yourself from **shortcuts**, **stars**, **keywords** and **app** sections.
 It runs fully on‑device and offline.
 
+![The dashboard](docs/screenshots/dashboard.png)
+
 > Requires the Supernote developer/beta firmware with the plugin system. Works on A5X, A5X2 (Manta)
 > and Nomad.
 
@@ -11,31 +13,36 @@ It runs fully on‑device and offline.
 
 ## 1. Install
 
-1. Copy `dashboard.snplg` into the **`MyStyle`** folder on your Supernote (USB, or the Partner app).
+1. Copy `dashboard.snplg` (from `dist/` or the Releases) into the **`MyStyle`** folder on your
+   Supernote (USB, or the Partner app).
 2. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.
-3. Open any note or document — a **Dashboard** button appears in the side toolbar.
 
-*(Screenshot 1 — the plugin in Settings → Apps → Plugins)*
-*(Screenshot 2 — the Dashboard button in the NOTE toolbar)*
+| Plugins list | Plugin details |
+|---|---|
+| ![Plugins list](docs/screenshots/install-plugins-list.png) | ![Plugin details](docs/screenshots/install-plugin-detail.png) |
+
+Once installed, open any note or document and tap the **Dashboard** button in the side toolbar to
+open Settings (below), or activate the bubble.
 
 ---
 
 ## 2. The bubble
 
-Tap the toolbar **Dashboard** button once, go to the **Finish** step and choose **Activate Bubble &
-close** — a small **⊕ bubble** now floats over everything (notes, folders, apps, settings…).
+From the wizard's **Finish** step, choose **Activate Bubble & close** — a small **⊕ bubble** now
+floats over everything (notes, folders, apps, settings…).
 
 - **Tap** the bubble → your dashboard opens full‑screen.
 - **Drag** it anywhere; it stays where you leave it.
 - **Long‑press** it → it closes (re‑activate it later from Settings).
 
-The bubble has three looks (chosen in Settings → *Look*): **⊕ only**, **⊕ + “Dashboard”**, or
-**⊕ + hint**.
+It has three looks (chosen in Settings → *Look*):
+
+| ⊕ only | ⊕ + label | ⊕ + hint |
+|---|---|---|
+| ![icon](docs/screenshots/bubble-icon.png) | ![label](docs/screenshots/bubble-label.png) | ![hint](docs/screenshots/bubble-hint.png) |
 
 > The bubble lives while the plugin is running (after you've opened a note this session). A device
 > reboot clears it — just re‑activate it once.
-
-*(Screenshot 3 — the bubble floating over a note, in each of the 3 modes)*
 
 ---
 
@@ -52,39 +59,45 @@ The dashboard is a stack (or 2‑column grid) of **sections**. Tap anything to a
 
 Top‑right of the dashboard: **⚙** (open Settings) and **⊖** (fold back to the bubble).
 
-*(Screenshot 4 — a full dashboard with all four section types, Boxed theme)*
-
 ---
 
 ## 4. Building your dashboard (Settings)
 
 Open Settings from the toolbar **Dashboard** button, or the **⚙** on the dashboard. It's a **4‑step
-wizard** — each **Next** saves automatically (so **Back** and **✕** never lose anything). **✕**
+wizard** — each **Next** saves automatically (so **← Back** and **✕** never lose anything). **✕**
 (top‑right) closes the plugin.
 
-**Step 1 · Look** — pick the **layout** (1 or 2 columns), the **design** (Ledger / Boxed / Airy,
-previewed on your layout), and the **bubble** style.
+### Step 1 · Look
 
-*(Screenshot 5 — Step 1, showing the layout & design snapshots)*
+Pick the **layout** (1 or 2 columns), the **design** (Ledger / Boxed / Airy, previewed on your
+layout), and the **bubble** style.
 
-**Step 2 · Sections** — a **live preview** of your page, and the list of sections. **＋** add a
-section (Shortcuts / Stars / Keywords / Apps — you can have several of the same kind), **▲▼**
-reorder, **✕** remove.
+![Step 1 — Look](docs/screenshots/wizard-1-look.png)
 
-*(Screenshot 6 — Step 2, live preview + section list)*
+### Step 2 · Sections
 
-**Step 3 · Content** — configure each section:
-- set the **refresh** policy (on open / when older than 6–24 h / manual);
-- rename any section (**✎ edit** the title, press **Done** to save);
-- **Shortcuts**: **＋ Folder / ＋ Note / ＋ PDF** (browse anywhere on the device), reorder with ▲▼;
-- **Stars / Keywords**: choose **folders to scan** (none = the whole device), and the **note order**
-  (by date / by name);
-- **Keywords**: **Group by** keyword or note, **View** as list / inline / by‑folder, and optionally
-  pick **specific keywords** (none = all).
+A **live preview** of your page, and the list of sections. **＋** add a section (Shortcuts / Stars /
+Keywords / Apps — you can have several of the same kind), **▲▼** reorder, **✕** remove.
 
-*(Screenshot 7 — Step 3, a Keywords section expanded)*
+![Step 2 — Sections](docs/screenshots/wizard-2-sections.png)
 
-**Step 4 · Finish** — **Go to Dashboard**, **Activate Bubble & close**, or **Reset to defaults**.
+### Step 3 · Content
+
+Configure each section — set the **refresh** policy, rename any section (**✎ edit**, press *Done* to
+save), pick **shortcut** targets (**＋ Folder / ＋ Note / ＋ PDF**, browse anywhere), choose **scan
+folders** and **note order** for Stars/Keywords, and the keyword **Group by** / **View**.
+
+![Step 3 — Content](docs/screenshots/wizard-3-content.png)
+
+Adding an app offers a curated **Supernote apps** list (plus *Show all apps*):
+
+![Add an app](docs/screenshots/wizard-3-add-app.png)
+
+### Step 4 · Finish
+
+**Go to Dashboard**, **Activate Bubble & close**, or **Reset to defaults**.
+
+![Step 4 — Finish](docs/screenshots/wizard-4-finish.png)
 
 ---
 
