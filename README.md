@@ -1,7 +1,6 @@
 # Dashboard for Supernote
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-black)](https://buymeacoffee.com/AgP42)
 
 A configurable, always‑available **dashboard** for Supernote e‑ink devices. A draggable **⊕ bubble**
 floats over everything; tap it to open a dashboard you compose yourself from **shortcuts**,
@@ -56,10 +55,6 @@ Official Supernote developer docs (the source of truth): https://docs.supernote.
 - The bundled Claude Code skill is adapted from [Laumss/Inkling](https://github.com/Laumss/Inkling)
   (MIT).
 - Research informed by the Supernote plugin community (see FINDINGS.md).
-
-## Support
-
-If this is useful to you, you can [buy me a coffee](https://buymeacoffee.com/AgP42) ☕ — thank you!
 
 ## License
 
