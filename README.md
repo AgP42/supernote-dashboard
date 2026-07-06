@@ -4,8 +4,8 @@
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20%E2%98%95-black)](https://ko-fi.com/agp42)
 
 A configurable, always‑available **dashboard** for Supernote e‑ink devices. A draggable **⊕ bubble**
-floats over everything; tap it to open a dashboard you compose yourself from **shortcuts**,
-**stars**, **keywords**, and **app launchers**. Fully on‑device and offline.
+floats over everything; tap it to open a dashboard you compose yourself from **shortcuts**, **recent
+files**, **stars**, **keywords**, and **app launchers**. Fully on‑device and offline.
 
 Works on **A5X**, **A5X2 (Manta)** and **Nomad** (Supernote developer/beta firmware with the plugin
 system).
@@ -16,12 +16,18 @@ system).
 
 - **Bubble** launcher (3 looks) that persists over notes, folders, and apps — tap to open,
   long‑press to close, drag to move.
-- **Shortcuts** to folders, notes, and PDFs — one tap.
-- **Stars** — every starred page across your notes, grouped by note (`p.4 ×6` for multiple stars).
+- **Shortcuts** to folders, notes, and PDFs — one tap; list / grid / inline. Add several at once
+  with a full‑page multi‑select browser.
+- **Recent** — recently‑opened notes & PDFs, read live (no scan).
+- **Stars** — every starred page across your notes, grouped by note, with an optional **line
+  preview**: the line's **handwriting image**, or **OCR text with an automatic image fallback** when
+  recognition fails. Delete a single star from the dashboard (keeps the handwriting).
 - **Keywords** — your notes' keywords as tappable chips; each opens its exact note + page.
-- **Apps** — launch ToDo, Calendar, Document, Search…
-- **Guided setup** — a 4‑step wizard (Look · Sections · Content · Finish); everything autosaves.
-- Themes (Ledger / Boxed / Airy), 1‑ or 2‑column layout, per‑section scan folders & sorting.
+- **Apps** — launch ToDo, Calendar, Mail, Search, Files…
+- **Guided setup** — a 3‑step wizard (Look · Sections · Content); everything autosaves.
+- **Save / load** named configurations (guards against an accidental Reset).
+- Themes (Ledger / Boxed / Airy), 1‑ or 2‑column masonry, adjustable text size, per‑section scan
+  folders & sorting, and an **incremental scan** cache (only re‑scans edited notes).
 
 ## Install
 

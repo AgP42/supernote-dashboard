@@ -1,8 +1,8 @@
 # Dashboard for Supernote — User Guide
 
 Dashboard turns a floating **⊕ bubble** into a launcher for your Supernote: one tap opens a
-dashboard you compose yourself from **shortcuts**, **stars**, **keywords** and **app** sections.
-It runs fully on‑device and offline.
+dashboard you compose yourself from **shortcuts**, **recent files**, **stars**, **keywords** and
+**app** sections. It runs fully on‑device and offline.
 
 ![The dashboard](docs/screenshots/dashboard.png)
 
@@ -21,107 +21,139 @@ It runs fully on‑device and offline.
 |---|---|
 | ![Plugins list](docs/screenshots/install-plugins-list.png) | ![Plugin details](docs/screenshots/install-plugin-detail.png) |
 
-Once installed, open any note or document and tap the **Dashboard** button in the side toolbar to
-open Settings (below), or activate the bubble.
+Open any note or document and tap the **Dashboard** button in the side toolbar to open Settings, or
+activate the bubble.
 
 ---
 
 ## 2. The bubble
 
-From the wizard's **Finish** step, choose **Activate Bubble & close** — a small **⊕ bubble** now
-floats over everything (notes, folders, apps, settings…).
+From the wizard's **Look** step (or the dashboard's **⊖** button) the small **⊕ bubble** floats over
+everything — notes, folders, apps, settings.
 
-- **Tap** the bubble → your dashboard opens full‑screen.
+- **Tap** → your dashboard opens full‑screen.
 - **Drag** it anywhere; it stays where you leave it.
-- **Long‑press** it → it closes (re‑activate it later from Settings).
+- **Long‑press** → it's deleted (re‑activate it later from the dashboard's **⊖**).
 
-It has three looks (chosen in Settings → *Look*):
+Three looks (chosen in Settings → *Look*):
 
 | ⊕ only | ⊕ + label | ⊕ + hint |
 |---|---|---|
 | ![icon](docs/screenshots/bubble-icon.png) | ![label](docs/screenshots/bubble-label.png) | ![hint](docs/screenshots/bubble-hint.png) |
 
-> The bubble lives while the plugin is running (after you've opened a note this session). A device
-> reboot clears it — just re‑activate it once.
-
 ---
 
 ## 3. The dashboard
 
-The dashboard is a stack (or 2‑column grid) of **sections**. Tap anything to act:
+The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything to act. Top‑left is a
+**⚙** to open Settings (kept away from the busy right side); top‑right are **↻ Refresh all** and
+**⊖** (fold back to the bubble).
 
 - **Shortcuts** — a folder (opens the file manager there), a note, or a PDF (opens the document).
-- **Stars** — every starred (★) page from the last scan, grouped by note; a page with several stars
-  shows `p.4 ×6`. Tap a page → the note opens there.
+  Lay them out as a list, a grid, or inline.
+- **Recent** — your recently‑opened notes & PDFs, read live from the device (no scan needed).
+- **Stars** — every starred (★) page from the last scan, grouped by note. Each star is a tappable
+  row; a **✕★** can delete just that star (see §5).
 - **Keywords** — your notes' keywords, shown as tappable **chips**; each chip opens that exact
   note + page.
-- **Apps** — buttons that launch ToDo, Calendar, Document, Search…
-
-Top‑right of the dashboard: **⚙** (open Settings) and **⊖** (fold back to the bubble).
+- **Apps** — buttons that launch ToDo, Calendar, Mail, Search, Files…
 
 ---
 
 ## 4. Building your dashboard (Settings)
 
-Open Settings from the toolbar **Dashboard** button, or the **⚙** on the dashboard. It's a **4‑step
-wizard** — each **Next** saves automatically (so **← Back** and **✕** never lose anything). **✕**
-(top‑right) closes the plugin.
+Open Settings from the toolbar **Dashboard** button, or the **⚙** on the dashboard. It's a **3‑step
+wizard**; every change **saves automatically**. The header always shows **↺ Reset all** and
+**▤ Save/load config** (see §6), and a **✕** to close. **▦ Save & go to Dashboard** (bottom‑left) or
+**Next →** move you along.
 
 ### Step 1 · Look
 
 Pick the **layout** (1 or 2 columns), the **design** (Ledger / Boxed / Airy, previewed on your
-layout), and the **bubble** style.
+layout), the **bubble** style, and the **text size** (bigger = easier finger taps).
 
 ![Step 1 — Look](docs/screenshots/wizard-1-look.png)
 
 ### Step 2 · Sections
 
-A **live preview** of your page, and the list of sections. **＋** add a section (Shortcuts / Stars /
-Keywords / Apps — you can have several of the same kind), **▲▼** reorder, **✕** remove.
+A **live preview** of your page and the list of sections. **＋** add a section (Shortcuts / Stars /
+Keywords / Apps / Recent — you can have several of the same kind), **▲▼** reorder, **✕** remove.
 
 ![Step 2 — Sections](docs/screenshots/wizard-2-sections.png)
 
 ### Step 3 · Content
 
-Configure each section — set the **refresh** policy, rename any section (**✎ edit**, press *Done* to
-save), pick **shortcut** targets (**＋ Folder / ＋ Note / ＋ PDF**, browse anywhere), choose **scan
-folders** and **note order** for Stars/Keywords, and the keyword **Group by** / **View**.
+Configure each section: the **refresh** policy, rename any section (**✎ edit**), pick **shortcut**
+targets (**＋ Add folder / note / PDF** — a full‑page multi‑select browser, see §7), choose **scan
+folders** and **note order** for Stars/Keywords, the keyword grouping, and the Stars **line preview**
+(see §5).
 
 ![Step 3 — Content](docs/screenshots/wizard-3-content.png)
 
-Adding an app offers a curated **Supernote apps** list (plus *Show all apps*):
+---
 
-![Add an app](docs/screenshots/wizard-3-add-app.png)
+## 5. Stars: line preview & delete
 
-### Step 4 · Finish
+For each starred page you can optionally show what's written **on the star's line** — set **Line
+preview** on a Stars section to:
 
-**Go to Dashboard**, **Activate Bubble & close**, or **Reset to defaults**.
+- **Off** — just `p.N`.
+- **Image** — the actual **handwriting** of the line (always legible).
+- **Text** — **OCR** to text where the recognizer can read it, and it **falls back to the handwriting
+  image** for any line it can't. Best of both.
 
-![Step 4 — Finish](docs/screenshots/wizard-4-finish.png)
+| Image | Text (OCR) | Text with image fallback |
+|---|---|---|
+| ![stars image](docs/screenshots/stars-image.png) | ![stars text](docs/screenshots/stars-text.png) | ![stars fallback](docs/screenshots/stars-fallback.png) |
+
+Turn on **Allow deleting** to get a **✕★** next to each star — it removes **just that five‑star**
+(your handwriting is kept), after a confirmation.
+
+> The line preview OCRs/renders per star, so it makes the scan slower — it only runs for notes that
+> changed since the last scan.
 
 ---
 
-## 5. Scanning
+## 6. Save / load configurations
 
-Stars and Keywords come from scanning your notes. Scanning is **on demand**: each section shows its
-**last scan** time and a **↻ Refresh** button with progress. It auto‑refreshes on first view, when
-stale, or on every open — your choice per the *Refresh* setting. Sections that scan the **same
-folders** share a single scan. With **no folder selected**, the whole device is scanned.
+The header's **▤ Save/load config** saves your whole dashboard under a name and reloads it anytime —
+handy before experimenting, or to recover after an accidental **↺ Reset all**. Profiles live in
+`MyStyle/Plugins/Dashboard/profiles.json`.
 
 ---
 
-## 6. Advanced
+## 7. Adding shortcuts (multi‑select browser)
+
+**＋ Add folder / note / PDF** opens a **full‑page browser**: navigate anywhere, tap notes/PDFs to
+select several at once, **＋** a folder to add it, then **Save (N)** adds them all in one go.
+
+![Add shortcuts](docs/screenshots/browser-multiselect.png)
+
+---
+
+## 8. Scanning
+
+Stars and Keywords come from scanning your notes. Each section shows its **last scan** time and a
+**↻ Refresh** button; **↻ Refresh all** (dashboard header) refreshes every section. The scan is
+**incremental** — the first scan of a folder set is slow, but afterwards only files you've **edited**
+are re‑scanned, so later scans are near‑instant. Sections that scan the **same folders** share one
+scan. Tip: point Stars/Keywords at `/Note` (or a subfolder) rather than the whole device for speed.
+
+---
+
+## 9. Advanced
 
 The whole configuration is a JSON file at **`MyStyle/Plugins/Dashboard/config.json`** — power users
-can edit it directly (folders, titles, keyword selections, etc.). The in‑app wizard writes the same
-file.
+can edit it directly. The wizard writes the same file.
 
 ---
 
-## 7. Good to know / limits
+## 10. Good to know / limits
 
-- **PDF pages**: a PDF opens on its last‑used page (jumping to a specific page isn't available yet).
+- **PDF pages**: a PDF opens on its last‑used page (jumping to a page isn't available yet).
 - **Stars/keywords in PDFs** aren't listed (the system only exposes them for notes).
+- **New stars/keywords** on the page you're editing appear after you **turn the page** (the editor
+  saves on page‑turn/close).
 - **Search** launches the native search but can't be pre‑filled.
 - If a **stray bubble** ever appears (e.g. after reinstalling), open the plugin once — it clears
   leftover bubbles — or long‑press to dismiss it.
