@@ -66,7 +66,9 @@ Official Supernote developer docs (the source of truth): https://docs.supernote.
 
 ## Support
 
-If this is useful to you, you can support it on [Ko‑fi](https://ko-fi.com/agp42) ☕ — thank you!
+If you enjoy this plugin, please consider [sponsoring a few tokens](https://ko-fi.com/agp42) ;-)
+My time and skills are free — the AI tokens behind this plugin are not!
+Thank you for your support ☕
 
 ## License
 
