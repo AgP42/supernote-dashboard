@@ -23,7 +23,7 @@ system).
   preview**: the line's **handwriting image**, or **OCR text with an automatic image fallback** when
   recognition fails. Delete a single star from the dashboard (keeps the handwriting).
 - **Keywords** — your notes' keywords as tappable chips; each opens its exact note + page.
-- **Apps** — launch ToDo, Calendar, Mail, Search, Files…
+- **Apps** — launch ToDo, Calendar, Document, Search, Files… (or any installed app).
 - **Guided setup** — a 3‑step wizard (Look · Sections · Content); everything autosaves.
 - **Save / load** named configurations (guards against an accidental Reset).
 - Themes (Ledger / Boxed / Airy), 1‑ or 2‑column masonry, adjustable text size, per‑section scan

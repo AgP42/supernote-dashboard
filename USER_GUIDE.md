@@ -28,8 +28,9 @@ activate the bubble.
 
 ## 2. The bubble
 
-From the wizard's **Look** step (or the dashboard's **⊖** button) the small **⊕ bubble** floats over
-everything — notes, folders, apps, settings.
+The dashboard's **⊖** button folds it into a small floating **⊕ bubble** (opening a note or shortcut
+from the dashboard also leaves it running as the bubble). It floats over everything — notes,
+folders, apps, settings. Its look is chosen in Settings → *Look*.
 
 - **Tap** → your dashboard opens full‑screen.
 - **Drag** it anywhere; it stays where you leave it.
@@ -56,7 +57,8 @@ The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything t
   row; a **✕★** can delete just that star (see §5).
 - **Keywords** — your notes' keywords, shown as tappable **chips**; each chip opens that exact
   note + page.
-- **Apps** — buttons that launch ToDo, Calendar, Mail, Search, Files…
+- **Apps** — buttons that launch ToDo, Calendar, Document, Search, Files… (or any installed app via
+  *Show all apps*).
 
 ---
 
