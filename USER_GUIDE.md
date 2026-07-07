@@ -30,13 +30,14 @@ activate the bubble.
 
 The dashboard's **⊖** button folds it into a small floating **⊕ bubble** (opening a note or shortcut
 from the dashboard also leaves it running as the bubble). It floats over everything — notes,
-folders, apps, settings. Its look is chosen in Settings → *Look*.
+folders, apps, settings.
 
 - **Tap** → your dashboard opens full‑screen.
 - **Drag** it anywhere; it stays where you leave it.
-- **Long‑press** → it's deleted (re‑activate it later from the dashboard's **⊖**).
 
-Three looks (chosen in Settings → *Look*):
+Its look — and turning it **Off** — is chosen in Settings → *Look* → Bubble. Turn it **Off** to use
+only the toolbar **Dashboard** button. **Before uninstalling the plugin, set the bubble to Off** so
+it doesn't linger on screen (otherwise a reboot clears it).
 
 | ⊕ only | ⊕ + label | ⊕ + hint |
 |---|---|---|
@@ -158,4 +159,4 @@ can edit it directly. The wizard writes the same file.
   saves on page‑turn/close).
 - **Search** launches the native search but can't be pre‑filled.
 - If a **stray bubble** ever appears (e.g. after reinstalling), open the plugin once — it clears
-  leftover bubbles — or long‑press to dismiss it.
+  leftover bubbles — or set **Bubble = Off** in Settings → Look.
