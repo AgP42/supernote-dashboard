@@ -31,7 +31,7 @@ system).
 
 ## Install
 
-1. Download **[`dist/dashboard.snplg`](dist/dashboard.snplg)** (or from the [Releases](../../releases),
+1. Download **[`dist/dashboard-v0.21.4.snplg`](dist/dashboard-v0.21.4.snplg)** (or from the [Releases](../../releases),
    or build it — see below).
 2. Copy it into the **`MyStyle`** folder on your Supernote.
 3. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.

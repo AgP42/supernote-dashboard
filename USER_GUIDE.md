@@ -13,7 +13,7 @@ dashboard you compose yourself from **shortcuts**, **recent files**, **stars**, 
 
 ## 1. Install
 
-1. Copy `dashboard.snplg` (from `dist/` or the Releases) into the **`MyStyle`** folder on your
+1. Copy `dashboard-v0.21.4.snplg` (from `dist/` or the Releases) into the **`MyStyle`** folder on your
    Supernote (USB, or the Partner app).
 2. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.
 
