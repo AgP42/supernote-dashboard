@@ -53,7 +53,9 @@ The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything t
 
 - **Shortcuts** — a folder (opens the file manager there), a note, or a PDF (opens the document).
   Lay them out as a list, a grid, or inline.
-- **Recent** — your recently‑opened notes & PDFs, read live from the device (no scan needed).
+- **Recent** — your recently‑opened notes & PDFs, read live from the device (no scan needed). Supernote
+  only tracks the **last 8** opened files, so this section shows **8 at most** (the count option tops out
+  there).
 - **Stars** — every starred (★) page from the last scan, grouped by note. Each star is a tappable
   row; a **✕★** can delete just that star (see §5).
 - **Keywords** — your notes' keywords, shown as tappable **chips**; each chip opens that exact

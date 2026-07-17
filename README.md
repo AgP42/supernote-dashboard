@@ -18,7 +18,7 @@ system).
   long‑press to close, drag to move.
 - **Shortcuts** to folders, notes, and PDFs — one tap; list / grid / inline. Add several at once
   with a full‑page multi‑select browser.
-- **Recent** — recently‑opened notes & PDFs, read live (no scan).
+- **Recent** — recently‑opened notes & PDFs, read live (no scan). The device tracks the last 8, so 8 max.
 - **Stars** — every starred page across your notes, grouped by note, with an optional **line
   preview**: the line's **handwriting image**, or **OCR text with an automatic image fallback** when
   recognition fails. Delete a single star from the dashboard (keeps the handwriting).
