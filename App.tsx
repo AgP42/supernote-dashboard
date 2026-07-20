@@ -3,14 +3,12 @@
  * Settings surface. See docs/dashboard-spec.md.
  * @format
  */
-import React, {useEffect, useRef, useState} from 'react';
-import {DeviceEventEmitter, NativeModules, ScrollView, Text, TouchableOpacity, View} from 'react-native';
-
-const {DashboardNative} = NativeModules;
+import React, {useEffect, useMemo, useState} from 'react';
+import {DeviceEventEmitter, ScrollView, Text, TouchableOpacity, View} from 'react-native';
 
 import {getRoute, setRoute, Route} from './src/route';
 import {DashboardConfig, loadConfig} from './src/config';
-import {showBubbleFromConfig} from './src/bubble';
+import {leavePlugin} from './src/bubble';
 import {tscale, ZoneView} from './src/zones';
 import {ui} from './src/ui';
 import {SettingsScreen} from './src/settings';
@@ -29,90 +27,67 @@ function App(): React.JSX.Element {
 
 function DashboardScreen(): React.JSX.Element {
   const [cfg, setCfg] = useState<DashboardConfig | null>(null);
-  const rootRef = useRef<View>(null);
-  // Hide the bubble only once the dashboard is measurably on screen — checked
-  // on mount AND on every re-entry (the tree is kept mounted across opens and
-  // this firmware doesn't emit the plugin life events, so a mount effect only
-  // ever fires once). measureInWindow polls: the view attaches some time after
-  // the tap; if it never attaches (host reports success without surfacing the
-  // view), nothing measures and the bubble stays so the user can tap again.
+  // `nonce` bumps every time the dashboard is (re)entered → live data (Recent)
+  // and config re-read even though the view may be kept mounted across opens.
+  const [nonce, setNonce] = useState(0);
+  // Reload config + bump `nonce` on mount and every dashboard (re)entry, so
+  // zones re-read their data against the fresh config in one render even though
+  // the view is kept mounted across opens. The bubble is NO LONGER hidden here:
+  // showing/hiding it is driven by AppState in index.js (the OS-level truth of
+  // whether the view is really on screen), so a failed showPluginView can't hide
+  // the bubble on a stale layout read anymore.
   useEffect(() => {
     let alive = true;
-    let hidden = false;
-    const poll = (attempt: number) => {
-      if (!alive || hidden) return;
-      rootRef.current?.measureInWindow((_x: number, _y: number, w: number, h: number) => {
-        if (!alive || hidden) return;
-        if (w > 0 && h > 0) {
-          hidden = true;
-          DashboardNative?.hideBubble?.().catch(() => {});
-        }
+    const enter = () => {
+      loadConfig().then(c => {
+        if (!alive) return;
+        setCfg(c);
+        setNonce(n => n + 1);
       });
-      if (attempt < 5) {
-        setTimeout(() => poll(attempt + 1), 400);
-      } else {
-        setTimeout(() => {
-          if (alive && !hidden)
-            DashboardNative?.appendLog?.('[bub] view never measured (bubble kept)').catch(() => {});
-        }, 400);
-      }
     };
-    const kick = () => {
-      hidden = false;
-      poll(0);
-    };
-    kick();
+    enter();
     const sub = DeviceEventEmitter.addListener('dashboard_route', (r: Route) => {
-      if (r === 'dashboard') kick();
+      if (r === 'dashboard') enter();
     });
     return () => {
       alive = false;
       sub.remove();
     };
   }, []);
-  // `nonce` bumps every time the dashboard is (re)entered → live data (Recent)
-  // and config re-read even though the view may be kept mounted across opens.
-  const [nonce, setNonce] = useState(0);
-  useEffect(() => {
-    const reload = () => {
-      loadConfig().then(setCfg);
-      setNonce(n => n + 1);
-    };
-    reload();
-    const sub = DeviceEventEmitter.addListener('dashboard_route', (r: Route) => {
-      if (r === 'dashboard') reload();
-    });
-    return () => sub.remove();
-  }, []);
 
-  const ts = cfg ? tscale(SCALE[cfg.textScale] ?? 1.4) : tscale(1.4);
+  const textScale = cfg?.textScale;
+  const ts = useMemo(() => tscale(textScale ? SCALE[textScale] ?? 1.4 : 1.4), [textScale]);
   // If the page has both Stars and Keywords, the first scan warms both in one
   // pass (per-file cache) so the second zone's scan is instant.
-  const sib = cfg
-    ? {
-        stars: cfg.zones.some(z => z.type === 'stars'),
-        keywords: cfg.zones.some(z => z.type === 'keywords'),
-      }
-    : undefined;
+  const sib = useMemo(
+    () =>
+      cfg
+        ? {
+            stars: cfg.zones.some(z => z.type === 'stars'),
+            keywords: cfg.zones.some(z => z.type === 'keywords'),
+          }
+        : undefined,
+    [cfg],
+  );
   const zoneEl = (z: DashboardConfig['zones'][number], i: number) => (
     <ZoneView key={i} zone={z} scan={cfg!.scan} theme={cfg!.theme} ts={ts} nonce={nonce} sib={sib} />
   );
 
   return (
-    <View style={ui.container} ref={rootRef}>
+    <View style={ui.container}>
       <View style={ui.header}>
         <View style={ui.headerBtns}>
           <Text style={ui.title}>Dashboard</Text>
           {/* config link on the LEFT, away from the frequently-tapped right side */}
-          <TouchableOpacity style={[ui.iconBtnGhost, {marginLeft: 10}]} onPress={() => setRoute('config')}>
-            <Text style={ui.iconTextGhost}>⚙</Text>
+          <TouchableOpacity style={ui.iconBtn} onPress={() => setRoute('config')}>
+            <Text style={ui.iconText}>⚙ Configuration</Text>
           </TouchableOpacity>
         </View>
         <View style={ui.headerBtns}>
           <TouchableOpacity style={ui.iconBtn} onPress={() => DeviceEventEmitter.emit('dashboard_refresh_all')}>
             <Text style={ui.iconText}>↻ Refresh all</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={ui.iconBtn} onPress={() => showBubbleFromConfig()}>
+          <TouchableOpacity style={ui.iconBtn} onPress={() => leavePlugin()}>
             <Text style={ui.iconText}>⊖</Text>
           </TouchableOpacity>
         </View>
@@ -121,18 +96,20 @@ function DashboardScreen(): React.JSX.Element {
       {cfg && cfg.zones.length === 0 && (
         <Text style={ui.hint}>No zone. Configure the dashboard via ⚙ Settings.</Text>
       )}
-      {cfg && cfg.layout === 'grid' ? (
-        // Masonry: two independent columns (even/odd) so a tall zone in one
-        // column doesn't leave whitespace next to a short one.
+      {cfg && (
         <ScrollView style={{flex: 1}}>
-          <View style={ui.zoneGrid}>
-            <View style={ui.zoneCol}>{cfg.zones.filter((_, i) => i % 2 === 0).map((z, k) => zoneEl(z, k * 2))}</View>
-            <View style={ui.zoneCol}>{cfg.zones.filter((_, i) => i % 2 === 1).map((z, k) => zoneEl(z, k * 2 + 1))}</View>
-          </View>
+          {cfg.layout === 'grid' ? (
+            // Masonry: two independent columns (even/odd) so a tall zone in one
+            // column doesn't leave whitespace next to a short one.
+            <View style={ui.zoneGrid}>
+              <View style={ui.zoneCol}>{cfg.zones.filter((_, i) => i % 2 === 0).map((z, k) => zoneEl(z, k * 2))}</View>
+              <View style={ui.zoneCol}>{cfg.zones.filter((_, i) => i % 2 === 1).map((z, k) => zoneEl(z, k * 2 + 1))}</View>
+            </View>
+          ) : (
+            cfg.zones.map((z, i) => zoneEl(z, i))
+          )}
         </ScrollView>
-      ) : cfg ? (
-        <ScrollView style={{flex: 1}}>{cfg.zones.map((z, i) => zoneEl(z, i))}</ScrollView>
-      ) : null}
+      )}
     </View>
   );
 }

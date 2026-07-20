@@ -3,26 +3,87 @@
  * A `theme` (ledger / boxed / airy) controls the visual shell via ZoneFrame;
  * the list bodies are shared. Stars & keywords use a per-session cache.
  */
-import React, {useEffect, useState} from 'react';
-import {Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {DeviceEventEmitter, Image, Text, TouchableOpacity, View} from 'react-native';
 
-import {KeywordDisplay, ScanSettings, Theme, Zone} from './config';
+import {KeywordDisplay, RECENT_MAX, ScanSettings, Theme, Zone} from './config';
 import {openFile, openFolder, launchApp} from './open';
-import {scanStars, scanKeywords, noteTitle, parentFolder, KeywordHit} from './scanner';
+import {deleteStarByIndex, LineImg} from './starText';
+import {NativeUIUtils} from 'sn-plugin-lib';
+import {scanStars, scanKeywords, flushCurrentNote, noteTitle, parentFolder, KeywordHit} from './scanner';
+import {readRecent} from './recent';
 import {getStars, setStars, getKeywords, setKeywords, formatScanTime, shouldAutoScan} from './scancache';
-import {Btn, ui} from './ui';
+import {Btn, fileGlyph, ui} from './ui';
 
-export function ZoneView({zone, scan, theme}: {zone: Zone; scan: ScanSettings; theme: Theme}) {
+/** Scaled style overrides for tappable text (bigger targets = fewer mis-taps). */
+export interface TScale {
+  s: number;
+  item: object;
+  page: object;
+  chip: object;
+  head: object;
+  app: object;
+}
+export function tscale(s: number): TScale {
+  return {
+    s,
+    item: {fontSize: 14 * s, paddingVertical: 6 * s},
+    page: {fontSize: 13 * s, paddingVertical: 4 * s},
+    chip: {fontSize: 13 * s, paddingVertical: 4 * s, paddingHorizontal: 11 * s},
+    head: {fontSize: 14 * s, marginTop: 6 * s},
+    app: {fontSize: 14 * s, paddingVertical: 6 * s, paddingHorizontal: 12 * s},
+  };
+}
+
+/** What other zones need, so the first scan can warm both dimensions in one pass. */
+export interface Siblings {
+  stars: boolean;
+  keywords: boolean;
+}
+
+export function ZoneView({zone, scan, theme, ts, nonce, sib}: {zone: Zone; scan: ScanSettings; theme: Theme; ts: TScale; nonce?: number; sib?: Siblings}) {
   switch (zone.type) {
     case 'shortcuts':
-      return <ShortcutsZone zone={zone} theme={theme} />;
+      return <ShortcutsZone zone={zone} theme={theme} ts={ts} />;
     case 'stars':
-      return <StarsZone zone={zone} scan={scan} theme={theme} />;
+      return <StarsZone zone={zone} scan={scan} theme={theme} ts={ts} sib={sib} nonce={nonce} />;
     case 'keywords':
-      return <KeywordsZone zone={zone} scan={scan} theme={theme} />;
+      return <KeywordsZone zone={zone} scan={scan} theme={theme} ts={ts} sib={sib} nonce={nonce} />;
     case 'apps':
-      return <AppsZone zone={zone} theme={theme} />;
+      return <AppsZone zone={zone} theme={theme} ts={ts} />;
+    case 'recent':
+      return <RecentZone zone={zone} theme={theme} ts={ts} nonce={nonce} />;
   }
+}
+
+// ---- Recent (reads the device's own recently-opened list) -----------------
+function RecentZone({zone, theme, ts, nonce}: {zone: Extract<Zone, {type: 'recent'}>; theme: Theme; ts: TScale; nonce?: number}) {
+  const [paths, setPaths] = useState<string[] | null>(null);
+  useEffect(() => {
+    readRecent().then(setPaths);
+    // re-read every time the dashboard is re-entered (nonce changes)
+  }, [nonce]);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('dashboard_refresh_all', () => readRecent().then(setPaths));
+    return () => sub.remove();
+  }, []);
+  const items = (paths ?? []).slice(0, zone.count ?? RECENT_MAX); // normalize() clamps count
+  const display = zone.display ?? 'list';
+  return (
+    <ZoneFrame theme={theme} title={zone.title || 'Recent'}>
+      {paths === null && <Text style={ui.empty}>loading…</Text>}
+      {paths && items.length === 0 && <Text style={ui.empty}>No recent files.</Text>}
+      <View style={display === 'list' ? undefined : ui.itemsWrap}>
+        {items.map((p, i) => (
+          <TouchableOpacity key={i} style={display === 'grid' ? ui.gridCell : undefined} onPress={() => openFile(p, 0)}>
+            <Text style={[display === 'inline' ? ui.appTile : ui.listItem, ts.item]}>
+              {fileGlyph(p)} {noteTitle(p)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ZoneFrame>
+  );
 }
 
 /** Themed shell around a zone's body. */
@@ -73,119 +134,235 @@ function ZoneFrame({
 }
 
 // ---- Shortcuts ------------------------------------------------------------
-function ShortcutsZone({zone, theme}: {zone: Extract<Zone, {type: 'shortcuts'}>; theme: Theme}) {
+function ShortcutsZone({zone, theme, ts}: {zone: Extract<Zone, {type: 'shortcuts'}>; theme: Theme; ts: TScale}) {
+  const display = zone.display ?? 'list';
+  const open = (it: any) => {
+    if (it.kind === 'folder') openFolder(it.path);
+    else openFile(it.path, it.kind === 'note-page' ? it.page : 0);
+  };
+  const glyph = (it: any) => (it.kind === 'folder' ? '📁' : fileGlyph(it.path));
+  const label = (it: any) => `${it.label}${it.kind === 'note-page' ? ` (p.${it.page})` : ''}`;
   return (
     <ZoneFrame theme={theme} title={zone.title || 'Shortcuts'}>
       {zone.items.length === 0 && <Text style={ui.empty}>(no shortcut configured)</Text>}
-      {zone.items.map((it, i) => (
-        <TouchableOpacity
-          key={i}
-          onPress={() => {
-            if (it.kind === 'folder') openFolder(it.path);
-            else if (it.kind === 'note-page') openFile(it.path, it.page);
-            else openFile(it.path, 0);
-          }}>
-          <Text style={ui.listItem}>
-            {it.kind === 'folder' ? '📁' : /\.pdf$/i.test(it.path) ? '📕' : '📄'} {it.label}
-            {it.kind === 'note-page' ? ` (p.${it.page})` : ''}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      <View style={display === 'list' ? undefined : ui.itemsWrap}>
+        {zone.items.map((it, i) => (
+          <TouchableOpacity
+            key={i}
+            style={display === 'grid' ? ui.gridCell : undefined}
+            onPress={() => open(it)}>
+            <Text style={[display === 'inline' ? ui.appTile : ui.listItem, ts.item]}>
+              {glyph(it)} {label(it)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </ZoneFrame>
   );
 }
 
-// ---- Stars ----------------------------------------------------------------
-function StarsZone({zone, scan, theme}: {zone: Extract<Zone, {type: 'stars'}>; scan: ScanSettings; theme: Theme}) {
-  const folders = zone.folders ?? [];
-  const cached = getStars(folders);
+/** A clipped horizontal strip of the page PNG showing one star's handwritten line. */
+function LineStrip({img}: {img: LineImg}) {
+  const [w, setW] = useState(0);
+  const dispH = img.aspect > 0 ? w / img.aspect : w * 1.333; // page shown at full width
+  const stripH = img.hFrac * dispH;
+  return (
+    <View
+      onLayout={e => setW(e.nativeEvent.layout.width)}
+      style={{width: '100%', height: Math.round(stripH), overflow: 'hidden', backgroundColor: '#ffffff'}}>
+      {w > 0 && (
+        <Image
+          source={{uri: 'file://' + img.png}}
+          style={{width: w, height: dispH, marginTop: -img.yFrac * dispH}}
+          resizeMode="stretch"
+        />
+      )}
+    </View>
+  );
+}
+
+/** Refresh button inline with the last-scan info. */
+function RefreshRow({busy, progress, meta, onPress}: {busy: boolean; progress: string; meta: string; onPress: () => void}) {
+  return (
+    <View style={ui.refreshRow}>
+      <Btn label={busy ? progress || 'scan…' : '↻ Refresh'} onPress={onPress} disabled={busy} small />
+      <Text style={[ui.zoneMeta, {marginLeft: 8}]}>{meta}</Text>
+    </View>
+  );
+}
+
+/**
+ * Shared scan lifecycle for the Stars/Keywords zones: busy/progress state, a
+ * manual refresh, auto-scan re-evaluated on each dashboard (re)entry (nonce) —
+ * so autoOnOpen / staleness re-check works even when the view stays mounted and
+ * the refresh closure stays current — and the global refresh-all listener.
+ */
+function useZoneScan(
+  cachedAt: number | undefined,
+  scan: ScanSettings,
+  nonce: number | undefined,
+  doScan: (setProgress: (p: string) => void, manual: boolean) => Promise<void>,
+) {
   const [, force] = useState(0);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
 
-  const refresh = async () => {
+  // `manual` = a user-triggered refresh (button / Refresh all), which also
+  // flushes the open note so its current-page edits are scanned. Auto-scan on
+  // open never flushes (flushing there foregrounded the editor — the reverted
+  // v0.20.2 regression).
+  const refresh = async (manual = false) => {
     setBusy(true);
     setProgress('scan…');
-    const res = await scanStars(folders, (d, t) => setProgress(`scan ${d}/${t}`));
-    setStars(folders, {at: Date.now(), notes: res.notes, truncated: res.truncated, total: res.total});
+    await doScan(setProgress, manual);
     setBusy(false);
     setProgress('');
     force(x => x + 1);
   };
   useEffect(() => {
-    if (!busy && shouldAutoScan(cached?.at, scan.autoRefreshHours, scan.autoOnOpen)) refresh();
+    if (!busy && shouldAutoScan(cachedAt, scan.autoRefreshHours, scan.autoOnOpen)) refresh(false);
+    const sub = DeviceEventEmitter.addListener('dashboard_refresh_all', () => refresh(true));
+    return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [nonce]);
+  return {busy, progress, refresh, setProgress};
+}
 
-  const meta = `last scan: ${formatScanTime(cached?.at)}${cached?.truncated ? ' (trunc.)' : ''}`;
+// ---- Stars ----------------------------------------------------------------
+function StarsZone({zone, scan, theme, ts, sib, nonce}: {zone: Extract<Zone, {type: 'stars'}>; scan: ScanSettings; theme: Theme; ts: TScale; sib?: Siblings; nonce?: number}) {
+  const folders = zone.folders ?? [];
+  const lineMode = zone.lineMode ?? 'off';
+  const cached = getStars(folders, lineMode);
+  const {busy, progress, refresh, setProgress} = useZoneScan(cached?.at, scan, nonce, async (setP, manual) => {
+    if (manual) await flushCurrentNote(folders); // catch stars on the page shown underneath
+    const res = await scanStars(folders, lineMode, !!sib?.keywords, (d, t, phase) =>
+      setP(`${phase === 'ocr' ? (lineMode === 'text' ? 'OCR' : 'render') : 'scan'} ${d}/${t}`),
+    );
+    setStars(folders, {at: Date.now(), notes: res.notes, truncated: res.truncated, total: res.total}, lineMode);
+  });
+
+  const canDelete = zone.canDelete ?? false;
+  const removeStar = async (file: string, page: number, index: number) => {
+    const ok = await NativeUIUtils.showRattaDialog(
+      `Delete this ★ on p.${page} of "${noteTitle(file)}"? (the handwriting is kept)`,
+      'Cancel',
+      'Delete',
+      false,
+    );
+    if (!ok) return;
+    if (await deleteStarByIndex(file, page - 1, index)) {
+      setProgress('deleting…');
+      await refresh(); // the note's mtime changed → it re-scans, star gone
+    } else {
+      NativeUIUtils.showRattaDialog('Could not delete the star — is the note open elsewhere?', '', 'OK', false).catch(() => {});
+    }
+  };
+
+  const meta = `last scan: ${formatScanTime(cached?.at)}${cached?.truncated ? ' (trunc.)' : ''}${
+    !cached ? ' — 1st scan is slow, next are fast' : ''
+  }`;
+  // Memoized: progress ticks during a scan re-render the zone ~3×/s, and each
+  // full-body rebuild is an expensive e-ink render of unchanged results.
+  const body = useMemo(() => {
+    // Cap how many handwriting strips render at once: each is a full-page
+    // bitmap, so an unbounded list could exhaust memory. Beyond the cap we
+    // fall back to "p.N".
+    const IMG_CAP = 12;
+    let shown = 0;
+    const notes = (cached?.notes ?? [])
+      .slice()
+      .sort((a, b) =>
+        (zone.noteSort ?? 'recent') === 'name'
+          ? noteTitle(a.file).localeCompare(noteTitle(b.file))
+          : b.mtime - a.mtime,
+      );
+    return notes.map((n, i) => (
+          <View key={i}>
+            <Text style={[ui.noteHead, ts.head]}>★ {noteTitle(n.file)}</Text>
+            {n.pages.map((p, j) => {
+              // one row per star (top→bottom), so delete can target a single star
+              const n2 = Math.max(p.lines?.length ?? 0, p.texts?.length ?? 0, p.count);
+              return Array.from({length: n2}).map((_, k) => {
+                const txt = p.texts?.[k];
+                const img = p.lines?.[k];
+                const useImg = !!(img && img.png) && shown < IMG_CAP;
+                if (useImg) shown++;
+                return (
+                  <View key={`${j}-${k}`} style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <TouchableOpacity style={{flex: 1}} onPress={() => openFile(n.file, p.page)}>
+                      {useImg ? (
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[ui.pageNum, {marginRight: 6}]}>p.{p.page}</Text>
+                          <View style={{flex: 1}}>
+                            <LineStrip img={img!} />
+                          </View>
+                        </View>
+                      ) : (
+                        <Text style={[ui.pageLine, ts.page]}>
+                          <Text style={ui.pageNum}>p.{p.page}</Text>
+                          {txt ? ` — ${txt}` : p.count > 1 ? ` ★${k + 1}` : ''}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    {canDelete && (
+                      <TouchableOpacity style={ui.miniBtn} onPress={() => removeStar(n.file, p.page, k)}>
+                        <Text style={ui.miniBtnText}>✕★</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              });
+            })}
+          </View>
+        ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cached, zone, ts]);
   return (
-    <ZoneFrame theme={theme} title={zone.title || 'Stars'} meta={meta}>
-      <View style={ui.refreshRow}>
-        <Btn label={busy ? progress || 'scan…' : '↻ Refresh'} onPress={refresh} disabled={busy} small />
-      </View>
+    <ZoneFrame theme={theme} title={zone.title || 'Stars'}>
+      <RefreshRow busy={busy} progress={progress} meta={meta} onPress={() => refresh(true)} />
       {!cached && !busy && <Text style={ui.empty}>(refresh to list stars)</Text>}
       {cached && cached.notes.length === 0 && <Text style={ui.empty}>No stars found.</Text>}
-      {cached?.notes
-        .slice()
-        .sort((a, b) =>
-          (zone.noteSort ?? 'recent') === 'name'
-            ? noteTitle(a.file).localeCompare(noteTitle(b.file))
-            : b.mtime - a.mtime,
-        )
-        .map((n, i) => (
-        <View key={i}>
-          <Text style={ui.noteHead}>★ {noteTitle(n.file)}</Text>
-          {n.pages.map((p, j) => (
-            <TouchableOpacity key={j} onPress={() => openFile(n.file, p.page)}>
-              <Text style={ui.pageLine}>
-                <Text style={ui.pageNum}>p.{p.page}</Text>
-                {p.count > 1 ? ` ×${p.count}` : ''}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ))}
+      {body}
     </ZoneFrame>
   );
 }
 
 // ---- Keywords -------------------------------------------------------------
-function KeywordsZone({zone, scan, theme}: {zone: Extract<Zone, {type: 'keywords'}>; scan: ScanSettings; theme: Theme}) {
+function KeywordsZone({zone, scan, theme, ts, sib, nonce}: {zone: Extract<Zone, {type: 'keywords'}>; scan: ScanSettings; theme: Theme; ts: TScale; sib?: Siblings; nonce?: number}) {
   const folders = zone.folders ?? [];
-  const cached = getKeywords(folders, zone.filter ?? '');
-  const [, force] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState('');
+  const cached = getKeywords(folders);
+  const {busy, progress, refresh} = useZoneScan(cached?.at, scan, nonce, async (setP, manual) => {
+    if (manual) await flushCurrentNote(folders); // catch keywords on the page shown underneath
+    // Only star DETECTION is shared here (cheap); the handwriting render runs
+    // only when the Stars zone itself scans.
+    const res = await scanKeywords(folders, !!sib?.stars, (d, t) => setP(`scan ${d}/${t}`));
+    setKeywords(folders, {at: Date.now(), hits: res.hits, truncated: res.truncated, total: res.total});
+  });
 
-  const refresh = async () => {
-    setBusy(true);
-    setProgress('scan…');
-    const res = await scanKeywords(folders, zone.filter, (d, t) => setProgress(`scan ${d}/${t}`));
-    setKeywords(folders, zone.filter ?? '', {at: Date.now(), hits: res.hits, truncated: res.truncated, total: res.total});
-    setBusy(false);
-    setProgress('');
-    force(x => x + 1);
-  };
-  useEffect(() => {
-    if (!busy && shouldAutoScan(cached?.at, scan.autoRefreshHours, scan.autoOnOpen)) refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const meta = `${zone.sort === 'note' ? 'by note' : 'by keyword'} · ${formatScanTime(cached?.at)}`;
+  const meta = `${zone.sort === 'note' ? 'by note' : 'by keyword'} · ${formatScanTime(cached?.at)}${
+    !cached ? ' — 1st scan slow, next fast' : ''
+  }`;
+  // Memoized: grouping/sorting hundreds of hits on every progress tick was a
+  // full-zone e-ink re-render of unchanged results.
+  const body = useMemo(
+    () =>
+      cached
+        ? renderKeywords(
+            filterHits(cached.hits, zone.keywords),
+            zone.sort,
+            zone.display ?? 'list',
+            zone.noteSort ?? 'recent',
+            ts,
+          )
+        : null,
+    [cached, zone, ts],
+  );
   return (
-    <ZoneFrame theme={theme} title={zone.title || 'Keywords'} meta={meta}>
-      <View style={ui.refreshRow}>
-        <Btn label={busy ? progress || 'scan…' : '↻ Refresh'} onPress={refresh} disabled={busy} small />
-      </View>
+    <ZoneFrame theme={theme} title={zone.title || 'Keywords'}>
+      <RefreshRow busy={busy} progress={progress} meta={meta} onPress={() => refresh(true)} />
       {!cached && !busy && <Text style={ui.empty}>(refresh to list keywords)</Text>}
       {cached && cached.hits.length === 0 && <Text style={ui.empty}>No keywords found.</Text>}
-      {cached &&
-        renderKeywords(
-          filterHits(cached.hits, zone.keywords),
-          zone.sort,
-          zone.display ?? 'list',
-          zone.noteSort ?? 'recent',
-        )}
+      {body}
     </ZoneFrame>
   );
 }
@@ -195,10 +372,6 @@ function filterHits(hits: KeywordHit[], allowed?: string[]): KeywordHit[] {
   if (!allowed || allowed.length === 0) return hits;
   const set = new Set(allowed.map(k => k.toLowerCase()));
   return hits.filter(h => set.has(h.keyword.toLowerCase()));
-}
-
-function mostRecent(list: KeywordHit[]): KeywordHit {
-  return list.reduce((a, b) => (b.mtime > a.mtime ? b : a));
 }
 
 function groupByKeyword(hits: KeywordHit[]): [string, KeywordHit[]][] {
@@ -217,17 +390,18 @@ function renderKeywords(
   sort: 'keyword' | 'note',
   display: KeywordDisplay,
   noteSort: 'recent' | 'name',
+  ts: TScale,
 ) {
-  if (display === 'inline') return renderInline(hits, noteSort);
-  if (display === 'byfolder') return renderByFolder(hits, noteSort);
-  return sort === 'note' ? renderListByNote(hits, noteSort) : renderListByKeyword(hits);
+  if (display === 'inline') return renderInline(hits, noteSort, ts);
+  if (display === 'byfolder') return renderByFolder(hits, noteSort, ts);
+  return sort === 'note' ? renderListByNote(hits, noteSort, ts) : renderListByKeyword(hits, ts);
 }
 
 /** A tappable bordered keyword chip. Opens the exact note+page it refers to. */
-function KwChip({label, onPress}: {label: string; onPress: () => void}) {
+function KwChip({label, onPress, ts}: {label: string; onPress: () => void; ts: TScale}) {
   return (
     <TouchableOpacity onPress={onPress}>
-      <Text style={ui.chip}>{label}</Text>
+      <Text style={[ui.chip, ts.chip]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -242,16 +416,16 @@ function groupByNote(hits: KeywordHit[]) {
 }
 
 // list · by keyword: bordered #keyword, then each occurrence as a tappable chip
-function renderListByKeyword(hits: KeywordHit[]) {
+function renderListByKeyword(hits: KeywordHit[], ts: TScale) {
   return groupByKeyword(hits).map(([kw, list], i) => (
     <View key={i} style={{marginTop: 6}}>
-      <Text style={ui.noteHead}>#{kw}</Text>
+      <Text style={[ui.noteHead, ts.head]}>#{kw}</Text>
       <View style={ui.row}>
         {list
           .slice()
           .sort((a, b) => b.mtime - a.mtime)
           .map((h, j) => (
-            <KwChip key={j} label={`${noteTitle(h.file)} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
+            <KwChip key={j} ts={ts} label={`${noteTitle(h.file)} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
           ))}
       </View>
     </View>
@@ -259,18 +433,18 @@ function renderListByKeyword(hits: KeywordHit[]) {
 }
 
 // list · by note: note title, then a tappable #keyword chip per occurrence
-function renderListByNote(hits: KeywordHit[], noteSort: 'recent' | 'name') {
+function renderListByNote(hits: KeywordHit[], noteSort: 'recent' | 'name', ts: TScale) {
   return groupByNote(hits)
     .sort(noteCmp(noteSort))
     .map(({file, list}, i) => (
       <View key={i} style={{marginTop: 6}}>
-        <Text style={ui.noteHead}>{noteTitle(file)}</Text>
+        <Text style={[ui.noteHead, ts.head]}>{noteTitle(file)}</Text>
         <View style={ui.row}>
           {list
             .slice()
             .sort((a, b) => a.page - b.page)
             .map((h, j) => (
-              <KwChip key={j} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
+              <KwChip key={j} ts={ts} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
             ))}
         </View>
       </View>
@@ -278,24 +452,24 @@ function renderListByNote(hits: KeywordHit[], noteSort: 'recent' | 'name') {
 }
 
 // inline: compact — note title + wrapped keyword chips on the same block
-function renderInline(hits: KeywordHit[], noteSort: 'recent' | 'name') {
+function renderInline(hits: KeywordHit[], noteSort: 'recent' | 'name', ts: TScale) {
   return groupByNote(hits)
     .sort(noteCmp(noteSort))
     .map(({file, list}, i) => (
       <View key={i} style={[ui.row, {marginTop: 5, alignItems: 'center'}]}>
-        <Text style={[ui.inlineKw, {marginRight: 6}]}>{noteTitle(file)}</Text>
+        <Text style={[ui.inlineKw, ts.head, {marginRight: 6}]}>{noteTitle(file)}</Text>
         {list
           .slice()
           .sort((a, b) => a.page - b.page)
           .map((h, j) => (
-            <KwChip key={j} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
+            <KwChip key={j} ts={ts} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
           ))}
       </View>
     ));
 }
 
 // byfolder: parent folder → note → keyword chips
-function renderByFolder(hits: KeywordHit[], noteSort: 'recent' | 'name') {
+function renderByFolder(hits: KeywordHit[], noteSort: 'recent' | 'name', ts: TScale) {
   const g = new Map<string, KeywordHit[]>();
   for (const h of hits) {
     const f = parentFolder(h.file);
@@ -303,18 +477,18 @@ function renderByFolder(hits: KeywordHit[], noteSort: 'recent' | 'name') {
   }
   return [...g.entries()].map(([folder, list], i) => (
     <View key={i} style={{marginTop: 6}}>
-      <Text style={ui.noteHead}>📁 {folder}</Text>
+      <Text style={[ui.noteHead, ts.head]}>📁 {folder}</Text>
       {groupByNote(list)
         .sort(noteCmp(noteSort))
         .map(({file, list: nl}, j) => (
           <View key={j} style={{marginLeft: 8}}>
-            <Text style={ui.pageLine}>{noteTitle(file)}</Text>
+            <Text style={[ui.pageLine, ts.page]}>{noteTitle(file)}</Text>
             <View style={ui.row}>
               {nl
                 .slice()
                 .sort((a, b) => a.page - b.page)
                 .map((h, k) => (
-                  <KwChip key={k} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
+                  <KwChip key={k} ts={ts} label={`#${h.keyword} p.${h.page}`} onPress={() => openFile(h.file, h.page)} />
                 ))}
             </View>
           </View>
@@ -324,15 +498,18 @@ function renderByFolder(hits: KeywordHit[], noteSort: 'recent' | 'name') {
 }
 
 // ---- Apps -----------------------------------------------------------------
-function AppsZone({zone, theme}: {zone: Extract<Zone, {type: 'apps'}>; theme: Theme}) {
-  const appStyle = theme === 'boxed' ? ui.appTile : theme === 'ledger' ? ui.appUnderline : ui.appPlain;
+function AppsZone({zone, theme, ts}: {zone: Extract<Zone, {type: 'apps'}>; theme: Theme; ts: TScale}) {
+  const display = zone.display ?? 'inline';
+  // 'list' → plain full-width rows; grid/inline → tiles
+  const appStyle =
+    display === 'list' ? ui.appPlain : theme === 'ledger' ? ui.appUnderline : ui.appTile;
   return (
     <ZoneFrame theme={theme} title={zone.title || 'Apps'}>
       {zone.apps.length === 0 && <Text style={ui.empty}>(no app configured)</Text>}
-      <View style={ui.row}>
+      <View style={display === 'list' ? undefined : ui.itemsWrap}>
         {zone.apps.map((a, i) => (
-          <TouchableOpacity key={i} onPress={() => launchApp(a.component)}>
-            <Text style={appStyle}>{a.label}</Text>
+          <TouchableOpacity key={i} style={display === 'grid' ? ui.gridCell : undefined} onPress={() => launchApp(a.component)}>
+            <Text style={[appStyle, ts.app]}>{a.label}</Text>
           </TouchableOpacity>
         ))}
       </View>

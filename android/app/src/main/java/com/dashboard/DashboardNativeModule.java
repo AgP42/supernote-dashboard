@@ -4,12 +4,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -49,13 +47,9 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
     private static View overlayView;
     private static WindowManager.LayoutParams overlayParams;
     private static int lastX = -1, lastY = -1;
-    private static boolean bubbleShown = false;
     private int startX, startY;
     private float startRawX, startRawY;
     private boolean dragging;
-    private boolean longFired;
-    private Runnable longPressRunnable;
-    private static final long LONG_PRESS_MS = 600;
     private static final String BUBBLE_TAG = "DASHBOARD_BUBBLE";
 
     public DashboardNativeModule(ReactApplicationContext ctx) {
@@ -206,14 +200,23 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
     // ---- Persistence / logging -------------------------------------------
 
     /** Write text to an absolute path (SDK has no writeFile). Creates parent dirs. */
+    /** Write atomically: fill a temp file then rename, so a kill mid-write can't
+     *  corrupt/truncate config.json or profiles.json. */
     @ReactMethod
     public void writeFile(String path, String content, Promise promise) {
         try {
             File f = new File(path);
             File parent = f.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            try (java.io.FileWriter w = new java.io.FileWriter(f, false)) {
+            File tmp = new File(path + ".tmp");
+            try (java.io.FileWriter w = new java.io.FileWriter(tmp, false)) {
                 w.write(content);
+                w.flush();
+            }
+            if (!tmp.renameTo(f)) {
+                // rename can fail if the target exists on some filesystems
+                f.delete();
+                if (!tmp.renameTo(f)) throw new java.io.IOException("rename failed");
             }
             promise.resolve(true);
         } catch (Exception e) {
@@ -221,10 +224,127 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
         }
     }
 
+    /** Delete files in `dir` whose name starts with `prefix`, except `keepName`.
+     *  Used to prune stale per-page handwriting PNGs (line_<hash>_p<n>_<mtime>.png). */
+    @ReactMethod
+    public void pruneMatching(String dir, String prefix, String keepName, Promise promise) {
+        try {
+            File[] kids = new File(dir).listFiles();
+            int removed = 0;
+            if (kids != null) {
+                for (File k : kids) {
+                    String n = k.getName();
+                    if (n.startsWith(prefix) && !n.equals(keepName) && k.isFile()) {
+                        if (k.delete()) removed++;
+                    }
+                }
+            }
+            promise.resolve(removed);
+        } catch (Exception e) {
+            promise.reject("PRUNE_FAILED", e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * PluginHost keeps every past version's files (app_<ts>.npk / _libs / oat)
+     * on reinstall — a plugin's footprint balloons over time. We run inside the
+     * PluginHost process, so we can delete our own old versions: keep the newest
+     * timestamp (the running one), drop the rest. dirPath = getPluginDirPath().
+     */
+    @ReactMethod
+    public void cleanupOldVersions(String dirPath, Promise promise) {
+        try {
+            File dir = new File(dirPath);
+            File[] files = dir.listFiles();
+            WritableMap m = Arguments.createMap();
+            if (files == null) { m.putDouble("freed", 0); m.putString("kept", "none"); promise.resolve(m); return; }
+            long maxTs = -1;
+            for (File f : files) {
+                String n = f.getName();
+                if (n.startsWith("app_") && n.endsWith(".npk")) {
+                    long ts = leadingTs(n.substring(4));
+                    if (ts > maxTs) maxTs = ts;
+                }
+            }
+            if (maxTs < 0) { m.putDouble("freed", 0); m.putString("kept", "none"); promise.resolve(m); return; }
+            String keep = Long.toString(maxTs);
+            long freed = 0;
+            // Older app_<ts>.npk and app_<ts>_libs directories
+            for (File f : files) {
+                String n = f.getName();
+                if (n.startsWith("app_") && !n.contains(keep)) freed += deleteRecursively(f);
+            }
+            // Compiled artifacts in oat/ for older versions
+            File oat = new File(dir, "oat");
+            if (oat.isDirectory()) freed += cleanOat(oat, keep);
+            m.putDouble("freed", (double) freed);
+            m.putString("kept", keep);
+            promise.resolve(m);
+        } catch (Exception e) {
+            promise.reject("CLEANUP_FAILED", e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** Leading run of digits of a string → long (-1 if none). */
+    private static long leadingTs(String s) {
+        int i = 0;
+        while (i < s.length() && Character.isDigit(s.charAt(i))) i++;
+        if (i == 0) return -1;
+        try { return Long.parseLong(s.substring(0, i)); } catch (Exception e) { return -1; }
+    }
+
+    /** Delete a file/dir recursively, returning the bytes reclaimed. */
+    private static long deleteRecursively(File f) {
+        long sum = 0;
+        if (f.isDirectory()) {
+            File[] kids = f.listFiles();
+            if (kids != null) for (File k : kids) sum += deleteRecursively(k);
+        } else {
+            sum += f.length();
+        }
+        f.delete();
+        return sum;
+    }
+
+    /** In oat/, drop compiled artifacts (app_<oldts>.odex/vdex/art) not matching keep. */
+    private static long cleanOat(File oat, String keep) {
+        long sum = 0;
+        File[] kids = oat.listFiles();
+        if (kids == null) return 0;
+        for (File k : kids) {
+            if (k.isDirectory()) {
+                sum += cleanOat(k, keep);
+            } else if (k.getName().startsWith("app_") && !k.getName().contains(keep)) {
+                sum += k.length();
+                k.delete();
+            }
+        }
+        return sum;
+    }
+
+    /** Read a whole text file, fresh each call (no fetch caching). Reads fully —
+     *  a single read() could truncate config/profiles and corrupt the JSON. */
+    @ReactMethod
+    public void readTextFile(String path, Promise promise) {
+        try {
+            File f = new File(path);
+            if (!f.exists()) {
+                promise.resolve("");
+                return;
+            }
+            byte[] all = java.nio.file.Files.readAllBytes(f.toPath());
+            promise.resolve(new String(all, "UTF-8"));
+        } catch (Exception e) {
+            promise.reject("READ_FAILED", e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+        }
+    }
+
     @ReactMethod
     public void appendLog(String text, Promise promise) {
         try {
             File f = new File("/storage/emulated/0/MyStyle/dashboard-log.txt");
+            // Cap the debug log so it can't grow without bound; start fresh.
+            if (f.length() > 262_144) f.delete();
             try (java.io.FileWriter w = new java.io.FileWriter(f, true)) {
                 w.write(text + "\n");
             }
@@ -235,28 +355,6 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
     }
 
     // ---- Overlay bubble ---------------------------------------------------
-
-    @ReactMethod
-    public void checkOverlayPermission(Promise promise) {
-        if (Build.VERSION.SDK_INT >= 23) {
-            promise.resolve(Settings.canDrawOverlays(getReactApplicationContext()));
-        } else {
-            promise.resolve(true);
-        }
-    }
-
-    @ReactMethod
-    public void requestOverlayPermission(Promise promise) {
-        try {
-            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getReactApplicationContext().getPackageName()));
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getReactApplicationContext().startActivity(i);
-            promise.resolve(true);
-        } catch (Exception e) {
-            promise.reject("PERM_REQ_FAILED", e.getMessage(), e);
-        }
-    }
 
     /**
      * Show the floating bubble. `label` under the glyph (empty=none), `hint` line
@@ -318,32 +416,27 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                         PixelFormat.OPAQUE);
+                // Coordinates are top-left origin (matches the drag handler).
+                // First placement (no dragged position yet) → top-right corner;
+                // x needs the laid-out width, so it's set in a post() below.
+                final boolean firstPlacement = lastX < 0;
                 overlayParams.gravity = Gravity.TOP | Gravity.START;
-                overlayParams.x = lastX >= 0 ? lastX : dp(40);
-                overlayParams.y = lastY >= 0 ? lastY : dp(120);
+                overlayParams.x = lastX >= 0 ? lastX : dp(40); // provisional; fixed on first layout
+                overlayParams.y = lastY >= 0 ? lastY : dp(40);
 
+                // No long-press: a tap opens the dashboard, a drag moves the bubble.
+                // (Long-press-to-delete fired on slow e-ink taps → the bubble vanished.
+                //  The bubble is turned off from Settings → Look instead.)
                 panel.setOnTouchListener((v, ev) -> {
                     switch (ev.getAction()) {
                         case MotionEvent.ACTION_DOWN:
                             startX = overlayParams.x; startY = overlayParams.y;
                             startRawX = ev.getRawX(); startRawY = ev.getRawY();
-                            dragging = false; longFired = false;
-                            longPressRunnable = () -> {
-                                if (!dragging) {
-                                    longFired = true;
-                                    removeOverlayInternal();
-                                    bubbleShown = false;
-                                    emit("onBubbleClosed", Arguments.createMap());
-                                }
-                            };
-                            main.postDelayed(longPressRunnable, LONG_PRESS_MS);
+                            dragging = false;
                             return true;
                         case MotionEvent.ACTION_MOVE: {
                             float dx = ev.getRawX() - startRawX, dy = ev.getRawY() - startRawY;
-                            if (!dragging && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-                                dragging = true;
-                                if (longPressRunnable != null) main.removeCallbacks(longPressRunnable);
-                            }
+                            if (!dragging && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) dragging = true;
                             if (dragging) {
                                 int vw = v.getWidth(), vh = v.getHeight();
                                 int maxX = Math.max(0, screenW() - vw);
@@ -355,12 +448,8 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
                             }
                             return true;
                         }
-                        case MotionEvent.ACTION_CANCEL:
-                            if (longPressRunnable != null) main.removeCallbacks(longPressRunnable);
-                            return true;
                         case MotionEvent.ACTION_UP:
-                            if (longPressRunnable != null) main.removeCallbacks(longPressRunnable);
-                            if (!dragging && !longFired) emit("onBubbleTap", Arguments.createMap());
+                            if (!dragging) emit("onBubbleTap", Arguments.createMap());
                             return true;
                         default:
                             return false;
@@ -369,7 +458,18 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
 
                 overlayView = panel;
                 wm.addView(overlayView, overlayParams);
-                bubbleShown = true;
+                if (firstPlacement) {
+                    // Snap to the top-right once the bubble's width is known.
+                    panel.post(() -> {
+                        try {
+                            int x = Math.max(0, screenW() - panel.getWidth() - dp(12));
+                            overlayParams.x = x;
+                            lastX = x;
+                            lastY = overlayParams.y;
+                            wm.updateViewLayout(panel, overlayParams);
+                        } catch (Exception ignored) {}
+                    });
+                }
                 promise.resolve(true);
             } catch (Exception e) {
                 promise.reject("SHOW_BUBBLE_FAILED", e.getClass().getSimpleName() + ": " + e.getMessage(), e);
@@ -378,15 +478,9 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void isBubbleShown(Promise promise) {
-        promise.resolve(bubbleShown && overlayView != null);
-    }
-
-    @ReactMethod
     public void hideBubble(Promise promise) {
         main.post(() -> {
             removeOverlayInternal();
-            bubbleShown = false;
             promise.resolve(true);
         });
     }
@@ -435,7 +529,6 @@ public class DashboardNativeModule extends ReactContextBaseJavaModule {
         if (removed > 0) {
             overlayView = null;
             overlayParams = null;
-            bubbleShown = false;
         }
         return removed;
     }

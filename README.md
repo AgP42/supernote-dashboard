@@ -1,75 +1,78 @@
-# Dashboard for Supernote
+# Dashboard (Supernote plugin)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20%E2%98%95-black)](https://ko-fi.com/agp42)
+A configurable, always‑available dashboard for Supernote e‑ink devices. Its face is a draggable
+**bubble** (⊕) that floats over everything; tap it to open the dashboard, drag it to move it.
 
-A configurable, always‑available **dashboard** for Supernote e‑ink devices. A draggable **⊕ bubble**
-floats over everything; tap it to open a dashboard you compose yourself from **shortcuts**, **recent
-files**, **stars**, **keywords**, and **app launchers**. Fully on‑device and offline.
+Capabilities validated on A5X + Manta are written up in the public repo's `docs/FINDINGS.md` and the
+`supernote-plugin-dev` skill under `.claude/skills/`.
 
-Works on **A5X**, **A5X2 (Manta)** and **Nomad** (Supernote developer/beta firmware with the plugin
-system).
+## Two surfaces
 
-![The dashboard on a Supernote Manta](docs/screenshots/dashboard.png)
+- **Bubble tap → Dashboard**: the composed result. `⊖` folds it back to the bubble; `⚙ Configuration`
+  (top‑left) opens Settings.
+- **Plugin toolbar button → Dashboard** too — except on first run (no config saved yet), which opens
+  the Settings wizard so there's something to configure.
+- **Settings** is a guided **3‑step wizard** (Look · Sections · Content); every change autosaves.
+  Header has Reset all + Save/load config.
 
-## Features
+## The bubble
 
-- **Bubble** launcher (3 looks) that persists over notes, folders, and apps — tap to open,
-  long‑press to close, drag to move.
-- **Shortcuts** to folders, notes, and PDFs — one tap; list / grid / inline. Add several at once
-  with a full‑page multi‑select browser.
-- **Recent** — recently‑opened notes & PDFs, read live (no scan). The device tracks the last 8, so 8 max.
-- **Stars** — every starred page across your notes, grouped by note, with an optional **line
-  preview**: the line's **handwriting image**, or **OCR text with an automatic image fallback** when
-  recognition fails. Delete a single star from the dashboard (keeps the handwriting).
-- **Keywords** — your notes' keywords as tappable chips; each opens its exact note + page.
-- **Apps** — launch ToDo, Calendar, Document, Search, Files… (or any installed app).
-- **Guided setup** — a 3‑step wizard (Look · Sections · Content); everything autosaves.
-- **Save / load** named configurations (guards against an accidental Reset).
-- Themes (Ledger / Boxed / Airy), 1‑ or 2‑column masonry, adjustable text size, per‑section scan
-  folders & sorting, and an **incremental scan** cache (only re‑scans edited notes).
+Shows top‑right on first use, then stays wherever you drag it. Hidden while the dashboard is on
+screen and restored on the way out — driven by the app's foreground state, so it self‑heals on every
+exit path (buttons, a stray system gesture, the host backgrounding the view) and can't get stranded.
+It's an overlay of the persistent plugin host, so it's re‑shown when the plugin reloads (after a
+reboot / auto power‑off). Turn it **Off** in Settings → Look to use only the toolbar button.
 
-## Install
+## Zones
 
-1. Download **[`dist/dashboard-v0.21.4.snplg`](dist/dashboard-v0.21.4.snplg)** (or from the [Releases](../../releases),
-   or build it — see below).
-2. Copy it into the **`MyStyle`** folder on your Supernote.
-3. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.
+Stacked (or 2‑column masonry), each one of:
 
-Full instructions and how to use every feature: **[USER_GUIDE.md](USER_GUIDE.md)**.
+- **Shortcuts** — open a folder, a note, or a PDF in one tap (list / grid / inline).
+- **Recent** — recently‑opened notes & PDFs, read live from `/Recent/Recent.txt` (no scan; device
+  caps it at 8).
+- **Stars** — five‑star pages from the scan, grouped by note; optional per‑star **line preview**
+  (handwriting image, or OCR text with image fallback); delete a single star (`✕★`).
+- **Keywords** — keyword occurrences as tappable chips; each opens its note + page.
+- **Apps** — launch device apps via exported‑activity intents.
 
-## Build from source
+## Scanning
 
-React Native **0.79.2** (locked to the device runtime), `sn-plugin-lib`, JDK 19+, Android SDK 35.
+Stars/Keywords come from scanning the chosen folders. The scan is **incremental** (a persisted
+per‑file cache keyed by path+mtime — only edited notes are re‑scanned), so the first scan of a folder
+set is slow and later ones are near‑instant. Zones over the same folders share one scan.
+
+A **manual ↻ Refresh** additionally flushes the note currently open underneath (`saveCurrentNote`) so
+stars/keywords you just added on the current page are caught without turning the page. Auto‑scan on
+open never flushes.
+
+## Storage
+
+- **Config** — JSON at `MyStyle/Plugins/Dashboard/config.json`, written by the wizard (native atomic
+  write, read via the native reader — `fetch` caches `file://`). Named profiles in `profiles.json`.
+  Hand‑editable; `normalize`/`normalizeZone` guard against malformed input.
+- **Caches** — the scan cache (`scancache.json`) and star line‑preview PNGs (`line_*.png`) live in
+  the **plugin‑private dir** (`getPluginDirPath()`), not `MyStyle` (which is cloud‑synced and
+  file‑observed — caches don't belong there). Orphaned line PNGs are garbage‑collected after every
+  Stars scan (a deleted star / removed note / preview turned off no longer leaks its PNG). Migrated
+  once from the old `MyStyle` location, which is then purged.
+
+## Build & deploy
 
 ```bash
-npm install
-chmod +x buildPlugin.sh android/gradlew
-./buildPlugin.sh          # → build/outputs/dashboard.snplg
+source ../env.sh
+./buildPlugin.sh                                   # → build/outputs/dashboard.snplg
+gio copy build/outputs/dashboard.snplg 'mtp://<device>/Supernote/MyStyle/dashboard.snplg'
+# install on device: Settings → Apps → Plugins → Add Plugin
 ```
 
-## For plugin developers
+## Known limitations
 
-- **[docs/FINDINGS.md](docs/FINDINGS.md)** — a field guide of everything learned building this:
-  opening notes/PDFs/apps by intent, the floating overlay, gestures, the scan APIs, build/deploy
-  quirks, device differences. Not in the official docs; verified on real hardware.
-- **[.claude/skills/supernote-plugin-dev](.claude/skills/supernote-plugin-dev)** — a Claude Code
-  skill (API quick‑reference + patterns + firmware‑verified gotchas) for building Supernote plugins.
-
-Official Supernote developer docs (the source of truth): https://docs.supernote.com/en
-
-## Credits
-
-- The bundled Claude Code skill is adapted from [Laumss/Inkling](https://github.com/Laumss/Inkling)
-  (MIT).
-- Research informed by the Supernote plugin community (see FINDINGS.md).
+- PDFs open on their last‑used page (no page‑jump yet).
+- Stars/keywords inside PDFs aren't returned by the SDK (notes only).
+- New stars/keywords on the page being edited are caught by a **manual ↻ Refresh** (which flushes the
+  open note); an auto‑scan alone sees them only after a page‑turn (when the editor saves).
 
 ## Support
 
-If you enjoy this plugin, please consider [sponsoring a few tokens](https://ko-fi.com/agp42) ;-)
-My time and skills are free — the AI tokens behind this plugin are not!
-Thank you for your support ☕
-
-## License
-
-[MIT](LICENSE) © 2026 AgP42
+Dashboard is a personal project built by a Supernote user, for Supernote users. If it saves you a few
+taps every day, a small contribution is appreciated: https://ko-fi.com/agp42

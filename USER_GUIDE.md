@@ -6,6 +6,13 @@ dashboard you compose yourself from **shortcuts**, **recent files**, **stars**, 
 
 ![The dashboard](docs/screenshots/dashboard.png)
 
+## See it in action
+
+![Dashboard demo](docs/dashboard-demo.gif)
+
+*Bubble → dashboard, opening shortcuts, adding a ★ and refreshing to catch it, keyword chips, the
+settings wizard, and folding back to the bubble.* ▶ [Full-quality walkthrough (MP4)](docs/dashboard-demo.mp4)
+
 > Requires the Supernote developer/beta firmware with the plugin system. Works on A5X, A5X2 (Manta)
 > and Nomad.
 
@@ -13,16 +20,17 @@ dashboard you compose yourself from **shortcuts**, **recent files**, **stars**, 
 
 ## 1. Install
 
-1. Copy `dashboard-v0.21.4.snplg` (from `dist/` or the Releases) into the **`MyStyle`** folder on your
+1. Copy `dashboard.snplg` (from `dist/` or the Releases) into the **`MyStyle`** folder on your
    Supernote (USB, or the Partner app).
-2. On the device: **Settings → Apps → Plugins → Add Plugin → dashboard**.
+2. On the device: **Settings → Apps → Plugins → Add Plugin → Dashboard**.
 
 | Plugins list | Plugin details |
 |---|---|
 | ![Plugins list](docs/screenshots/install-plugins-list.png) | ![Plugin details](docs/screenshots/install-plugin-detail.png) |
 
-Open any note or document and tap the **Dashboard** button in the side toolbar to open Settings, or
-activate the bubble.
+Open any note or document and tap the **Dashboard** button in the side toolbar. On first run it opens
+the Settings wizard (nothing is configured yet); afterwards it opens your dashboard directly. The
+floating bubble also opens the dashboard from anywhere.
 
 ---
 
@@ -33,7 +41,11 @@ from the dashboard also leaves it running as the bubble). It floats over everyth
 folders, apps, settings.
 
 - **Tap** → your dashboard opens full‑screen.
-- **Drag** it anywhere; it stays where you leave it.
+- **Drag** it anywhere; it stays where you leave it. On its very first appearance it sits **top‑right**.
+
+The bubble hides itself while the dashboard is open and comes back when you leave — automatically, by
+any exit (buttons, a stray edge gesture, the system backgrounding the view), so it never gets stuck
+off‑screen. After a device restart (or auto power‑off) it re‑appears when the plugin next loads.
 
 Its look — and turning it **Off** — is chosen in Settings → *Look* → Bubble. Turn it **Off** to use
 only the toolbar **Dashboard** button. **Before uninstalling the plugin, set the bubble to Off** so
@@ -47,9 +59,9 @@ it doesn't linger on screen (otherwise a reboot clears it).
 
 ## 3. The dashboard
 
-The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything to act. Top‑left is a
-**⚙** to open Settings (kept away from the busy right side); top‑right are **↻ Refresh all** and
-**⊖** (fold back to the bubble).
+The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything to act. Top‑left is
+**⚙ Configuration** to open Settings (kept away from the busy right side); top‑right are
+**↻ Refresh all** and **⊖** (fold back to the bubble).
 
 - **Shortcuts** — a folder (opens the file manager there), a note, or a PDF (opens the document).
   Lay them out as a list, a grid, or inline.
@@ -67,10 +79,10 @@ The dashboard is a stack (or 2‑column masonry) of **sections**. Tap anything t
 
 ## 4. Building your dashboard (Settings)
 
-Open Settings from the toolbar **Dashboard** button, or the **⚙** on the dashboard. It's a **3‑step
-wizard**; every change **saves automatically**. The header always shows **↺ Reset all** and
+Open Settings from **⚙ Configuration** on the dashboard (or the toolbar button on first run). It's a
+**3‑step wizard**; every change **saves automatically**. The header always shows **↺ Reset all** and
 **▤ Save/load config** (see §6), and a **✕** to close. **▦ Save & go to Dashboard** (bottom‑left) or
-**Next →** move you along.
+**Next →** move you along. A support footer sits under the nav bar on every step.
 
 ### Step 1 · Look
 
@@ -144,12 +156,16 @@ Stars and Keywords come from scanning your notes. Each section shows its **last 
 are re‑scanned, so later scans are near‑instant. Sections that scan the **same folders** share one
 scan. Tip: point Stars/Keywords at `/Note` (or a subfolder) rather than the whole device for speed.
 
+A **manual ↻ Refresh** also saves the note you have open underneath, so a star or keyword you *just*
+added on the current page shows up straight away — no need to turn the page first.
+
 ---
 
 ## 9. Advanced
 
 The whole configuration is a JSON file at **`MyStyle/Plugins/Dashboard/config.json`** — power users
-can edit it directly. The wizard writes the same file.
+can edit it directly. The wizard writes the same file. (Scan caches and star‑line images live in the
+plugin's private folder instead, so they aren't synced to the cloud and are cleaned up automatically.)
 
 ---
 
@@ -157,8 +173,9 @@ can edit it directly. The wizard writes the same file.
 
 - **PDF pages**: a PDF opens on its last‑used page (jumping to a page isn't available yet).
 - **Stars/keywords in PDFs** aren't listed (the system only exposes them for notes).
-- **New stars/keywords** on the page you're editing appear after you **turn the page** (the editor
-  saves on page‑turn/close).
+- **New stars/keywords** on the page you're editing show up when you tap **↻ Refresh** (it saves the
+  open note first). Without a manual refresh they appear after you **turn the page** (the editor saves
+  on page‑turn/close).
 - **Search** launches the native search but can't be pre‑filled.
 - If a **stray bubble** ever appears (e.g. after reinstalling), open the plugin once — it clears
   leftover bubbles — or set **Bubble = Off** in Settings → Look.

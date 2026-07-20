@@ -3,15 +3,15 @@
  * its last results with a timestamp without rescanning on every open.
  * Persisted-across-sessions caching is a v2 item.
  */
-import {StarNote, KeywordHit} from './scanner';
+import {StarNote, KeywordHit, foldersKey} from './scanner';
 
-export interface StarsCacheEntry {
+interface StarsCacheEntry {
   at: number; // Date.now() of the scan
   notes: StarNote[];
   truncated: boolean;
   total: number;
 }
-export interface KeywordsCacheEntry {
+interface KeywordsCacheEntry {
   at: number;
   hits: KeywordHit[];
   truncated: boolean;
@@ -21,14 +21,14 @@ export interface KeywordsCacheEntry {
 const starsCache = new Map<string, StarsCacheEntry>();
 const keywordsCache = new Map<string, KeywordsCacheEntry>();
 
-const key = (roots: string[], extra = '') => roots.slice().sort().join('|') + '#' + extra;
+const key = (roots: string[], extra = '') => foldersKey(roots) + '#' + extra;
 
-export const getStars = (roots: string[]) => starsCache.get(key(roots));
-export const setStars = (roots: string[], e: StarsCacheEntry) => starsCache.set(key(roots), e);
+export const getStars = (roots: string[], lineMode = 'off') => starsCache.get(key(roots, lineMode[0]));
+export const setStars = (roots: string[], e: StarsCacheEntry, lineMode = 'off') =>
+  starsCache.set(key(roots, lineMode[0]), e);
 
-export const getKeywords = (roots: string[], filter = '') => keywordsCache.get(key(roots, filter));
-export const setKeywords = (roots: string[], filter: string, e: KeywordsCacheEntry) =>
-  keywordsCache.set(key(roots, filter), e);
+export const getKeywords = (roots: string[]) => keywordsCache.get(key(roots));
+export const setKeywords = (roots: string[], e: KeywordsCacheEntry) => keywordsCache.set(key(roots), e);
 
 /** Date-time label for a scan timestamp. */
 export function formatScanTime(at: number | undefined): string {

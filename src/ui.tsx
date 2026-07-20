@@ -1,10 +1,9 @@
 /** Shared e-ink UI primitives (high contrast, no animation). */
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, TouchableOpacity} from 'react-native';
 
-export function Hairline(): React.JSX.Element {
-  return <View style={ui.hairline} />;
-}
+/** Glyph for a file target (📕 pdf / 📄 note). */
+export const fileGlyph = (path: string) => (/\.pdf$/i.test(path) ? '📕' : '📄');
 
 export function Btn({
   label,
@@ -35,12 +34,11 @@ export const ui = StyleSheet.create({
   headerBtns: {flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', flexShrink: 0},
   iconBtn: {flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: '#000000', paddingVertical: 4, paddingHorizontal: 12, marginLeft: 6},
   iconText: {fontSize: 18, fontWeight: '700', color: '#000000'},
-  iconBtnGhost: {paddingVertical: 4, paddingHorizontal: 8, marginLeft: 6},
-  iconTextGhost: {fontSize: 18, color: '#777777'},
   hint: {fontSize: 12, color: '#000000', marginTop: 6, marginBottom: 8},
-  hairline: {height: 1, backgroundColor: '#000000', marginVertical: 12, opacity: 0.5},
-  zoneGrid: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'},
-  zoneCell: {width: '48%'},
+  zoneGrid: {flexDirection: 'row', alignItems: 'flex-start'},
+  zoneCol: {flex: 1, paddingHorizontal: 4},
+  itemsWrap: {flexDirection: 'row', flexWrap: 'wrap'},
+  gridCell: {width: '50%'},
   btn: {borderWidth: 2, borderColor: '#000000', paddingVertical: 9, paddingHorizontal: 14, marginRight: 8, marginBottom: 8},
   btnSmall: {paddingVertical: 5, paddingHorizontal: 9, marginRight: 6, marginBottom: 6},
   btnDisabled: {borderColor: '#999999'},
@@ -73,21 +71,17 @@ export const ui = StyleSheet.create({
   appTile: {borderWidth: 1.5, borderColor: '#000000', borderRadius: 7, paddingVertical: 6, paddingHorizontal: 12, marginRight: 6, marginBottom: 6, fontSize: 13, fontWeight: '600', color: '#000000'},
   appPlain: {fontSize: 14, fontWeight: '600', color: '#000000', marginRight: 18, marginBottom: 4},
   chip: {borderWidth: 1.2, borderColor: '#000000', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10, marginRight: 6, marginBottom: 6, fontSize: 13, color: '#000000'},
-  inlineLine: {fontSize: 13.5, color: '#000000', paddingVertical: 4},
   inlineKw: {fontWeight: '700', color: '#000000'},
   // config
-  json: {flex: 1, borderWidth: 1, borderColor: '#000000', padding: 8, color: '#000000', fontFamily: 'monospace', fontSize: 12, textAlignVertical: 'top'},
   titleInput: {borderWidth: 1.5, borderColor: '#000000', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: '#000000', backgroundColor: '#ffffff'},
   status: {fontSize: 12, color: '#000000', marginBottom: 6},
-  picker: {maxHeight: 320, borderWidth: 1, borderColor: '#000000', marginTop: 4},
-  pickerItem: {fontSize: 13, color: '#000000', padding: 8, borderBottomWidth: 1, borderColor: '#cccccc'},
+  pickerFull: {flex: 1, borderWidth: 1, borderColor: '#000000', marginTop: 6},
+  pickerItem: {fontSize: 15, color: '#000000', padding: 11, borderBottomWidth: 1, borderColor: '#cccccc'},
+  pickerRow: {flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#cccccc'},
+  pickerRowText: {flex: 1, fontSize: 15, color: '#000000', padding: 11},
+  pickerRowSel: {backgroundColor: '#efefef'},
+  pickerAdd: {borderWidth: 1.5, borderColor: '#000000', borderRadius: 6, paddingVertical: 3, paddingHorizontal: 9, marginRight: 8},
   // stepper / structured settings
-  stepper: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 8},
-  stepTab: {borderWidth: 1, borderColor: '#000000', paddingVertical: 5, paddingHorizontal: 9, marginRight: 4, marginBottom: 4},
-  stepTabOn: {backgroundColor: '#000000'},
-  stepText: {fontSize: 13, color: '#000000', fontWeight: '600'},
-  stepTextOn: {color: '#ffffff'},
-  groupLabel: {fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: '#555555', fontWeight: '700', marginTop: 14, marginBottom: 6},
   subLabel: {fontSize: 11, color: '#666666', marginTop: 8, marginBottom: 4},
   choice: {borderWidth: 1.5, borderColor: '#000000', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14, marginRight: 8, marginBottom: 8},
   choiceOn: {backgroundColor: '#000000'},
@@ -104,16 +98,22 @@ export const ui = StyleSheet.create({
   // wizard
   wizTitle: {fontSize: 22, fontWeight: '700', color: '#000000'},
   wizStepTag: {fontSize: 12, letterSpacing: 1.5, textTransform: 'uppercase', color: '#666666', fontWeight: '700', marginTop: 10, marginBottom: 8},
-  navBar: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTopWidth: 1, borderColor: '#dddddd'},
-  navBtn: {borderWidth: 2, borderColor: '#000000', borderRadius: 9, paddingVertical: 10, paddingHorizontal: 18},
+  navBar: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 6, borderTopWidth: 1, borderColor: '#dddddd'},
+  navLeft: {flexDirection: 'row', alignItems: 'center', flexShrink: 1, flexWrap: 'wrap'},
+  navBtn: {borderWidth: 2, borderColor: '#000000', borderRadius: 9, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, marginBottom: 4},
   navBtnPri: {backgroundColor: '#000000'},
-  navBtnText: {fontSize: 16, fontWeight: '700', color: '#000000'},
+  navBtnText: {fontSize: 14, fontWeight: '700', color: '#000000'},
   navBtnTextPri: {color: '#ffffff'},
   snapWrap: {flexDirection: 'row', flexWrap: 'wrap'},
   snap: {borderWidth: 2, borderColor: '#000000', borderRadius: 10, padding: 8, marginRight: 14, marginBottom: 14, alignItems: 'center'},
   snapOn: {borderWidth: 3},
   snapLabel: {fontSize: 14, fontWeight: '700', color: '#000000', textAlign: 'center', marginTop: 8},
   snapLabelOn: {textDecorationLine: 'underline'},
+  // ko-fi footer (same look as SmartNote AI's)
+  kofiRow: {flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderColor: '#000000', paddingTop: 8, marginTop: 8},
+  kofiText: {fontSize: 12, color: '#000000', lineHeight: 17},
+  kofiLink: {fontSize: 12, color: '#000000', fontWeight: '700', marginTop: 2},
+  kofiQr: {width: 74, height: 74, borderWidth: 1, borderColor: '#000000', marginLeft: 10},
   // schematic mini page
   miniPage: {borderWidth: 1, borderColor: '#000000', borderRadius: 8, backgroundColor: '#ffffff', padding: 7, overflow: 'hidden'},
   miniPageTitle: {fontSize: 10, fontWeight: '700', color: '#000000', marginBottom: 5},

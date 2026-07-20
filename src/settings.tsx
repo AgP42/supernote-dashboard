@@ -1,43 +1,55 @@
 /**
- * Settings — a guided wizard (Save happens on each Next):
- *   1 Layout + Bubble   2 Design (theme)   3 Sections (+ live preview)
- *   4 Content (per-zone details, refresh, sorts)   5 Finish
- * A ✕ (top-right) closes the plugin from any step. No JSON editor here —
- * advanced users edit MyStyle/Plugins/Dashboard/config.json directly.
+ * Settings — a guided 3-step wizard; every change autosaves.
+ *   1 Look (layout · design · bubble · text size)
+ *   2 Sections (+ live preview, add/reorder/remove)
+ *   3 Content (per-zone details, refresh, sorts, line preview)
+ * The header has Reset all + Save/load config; a ✕ closes the plugin. No JSON
+ * editor here — advanced users edit MyStyle/Plugins/Dashboard/config.json directly.
  */
 import React, {useEffect, useState} from 'react';
-import {NativeModules, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
-import {PluginManager} from 'sn-plugin-lib';
+import {Image, NativeModules, ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
+
+const KOFI_QR = require('../assets/kofi-qr.png');
 
 import {
   BubbleMode,
   DashboardConfig,
   DEFAULT_CONFIG,
   KeywordDisplay,
-  Layout,
   loadConfig,
   NoteSort,
+  RECENT_MAX,
   saveConfig,
+  TextScale,
   Theme,
   Zone,
+  listProfiles,
+  saveProfile,
+  loadProfile,
+  deleteProfile,
 } from './config';
 import {setRoute} from './route';
-import {showBubbleFromConfig} from './bubble';
-import {scanKeywords, basename} from './scanner';
+import {leavePlugin} from './bubble';
+import {scanKeywords, basename, noteTitle} from './scanner';
 import {APP_BLOCK, CURATED_APPS} from './apps';
-import {Btn, ui} from './ui';
+import {Btn, fileGlyph as fileKindGlyph, ui} from './ui';
 
 const {DashboardNative} = NativeModules;
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 
+interface Pick {
+  kind: 'folder' | 'file';
+  path: string;
+}
 type Modal =
   | null
-  | {kind: 'browse'; allow: 'folder' | 'note' | 'pdf'; onPick: (path: string) => void}
+  | {kind: 'browse'; onPick: (path: string) => void} // pick one folder (scan scope)
+  | {kind: 'shortcuts'; onDone: (picks: Pick[]) => void} // multi-select folders/notes/PDFs
   | {kind: 'apps'; onPick: (a: {label: string; component: string}) => void}
   | {kind: 'kw'; folders: string[]; onPick: (kw: string) => void}
-  | {kind: 'text'; title: string; initial: string; onSubmit: (t: string) => void};
+  | {kind: 'profiles'; cfg: DashboardConfig; onLoad: (c: DashboardConfig) => void};
 
-const STEP_TITLES = ['Look', 'Sections', 'Content', 'Finish'];
+const STEP_TITLES = ['Look', 'Sections', 'Content'];
 const LAST_STEP = STEP_TITLES.length;
 
 export function SettingsScreen(): React.JSX.Element {
@@ -66,42 +78,74 @@ export function SettingsScreen(): React.JSX.Element {
   return (
     <View style={ui.container}>
       <View style={ui.header}>
-        <Text style={ui.wizTitle}>
-          {step}/{LAST_STEP} · {STEP_TITLES[step - 1]}
-        </Text>
-        <TouchableOpacity style={ui.iconBtn} onPress={() => PluginManager.closePluginView()}>
+        <View style={ui.headerBtns}>
+          <TouchableOpacity style={ui.iconBtn} onPress={() => update(c => Object.assign(c, clone(DEFAULT_CONFIG)))}>
+            <Text style={ui.iconText}>↺ Reset all</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={ui.iconBtn}
+            onPress={() => setModal({kind: 'profiles', cfg, onLoad: c => update(x => Object.assign(x, c))})}>
+            <Text style={ui.iconText}>▤ Save/load config</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={ui.iconBtn} onPress={() => leavePlugin()}>
           <Text style={ui.iconText}>✕</Text>
         </TouchableOpacity>
       </View>
+      <Text style={ui.wizStepTag}>
+        {step}/{LAST_STEP} · {STEP_TITLES[step - 1]}
+      </Text>
 
       <ScrollView style={{flex: 1}}>
         {step === 1 && <StepLook cfg={cfg} update={update} />}
         {step === 2 && <StepSections cfg={cfg} update={update} />}
         {step === 3 && <StepContent cfg={cfg} update={update} openModal={setModal} />}
-        {step === 4 && <StepFinish cfg={cfg} update={update} />}
       </ScrollView>
 
       <View style={ui.navBar}>
-        {step > 1 ? (
-          <TouchableOpacity style={ui.navBtn} onPress={goBack}>
-            <Text style={ui.navBtnText}>← Back</Text>
-          </TouchableOpacity>
-        ) : (
-          <View />
-        )}
+        <View style={ui.navLeft}>
+          {step > 1 && (
+            <TouchableOpacity style={ui.navBtn} onPress={goBack}>
+              <Text style={ui.navBtnText}>← Back</Text>
+            </TouchableOpacity>
+          )}
+          {step < LAST_STEP && <GoDashboardBtn />}
+        </View>
         {step < LAST_STEP ? (
           <TouchableOpacity style={[ui.navBtn, ui.navBtnPri]} onPress={goNext}>
             <Text style={[ui.navBtnText, ui.navBtnTextPri]}>Next →</Text>
           </TouchableOpacity>
         ) : (
-          <View />
+          <GoDashboardBtn primary />
         )}
+      </View>
+      {/* Fixed footer on all 3 steps: nav row above, a rule, then the support blurb. */}
+      <View style={ui.kofiRow}>
+        <View style={{flex: 1}}>
+          <Text style={ui.kofiText}>
+            Dashboard is a personal project built by a Supernote user, for Supernote users. I built
+            it with love, time, skills and expensive (AI) tokens ;-) If it saves you a few taps
+            every day, please consider a small contribution:
+          </Text>
+          <Text selectable style={ui.kofiLink}>
+            https://ko-fi.com/agp42
+          </Text>
+        </View>
+        <Image source={KOFI_QR} style={ui.kofiQr} resizeMode="contain" />
       </View>
     </View>
   );
 }
 
 type UP = (fn: (c: DashboardConfig) => void) => void;
+
+function GoDashboardBtn({primary}: {primary?: boolean}) {
+  return (
+    <TouchableOpacity style={[ui.navBtn, primary && ui.navBtnPri]} onPress={() => setRoute('dashboard')}>
+      <Text style={[ui.navBtnText, primary && ui.navBtnTextPri]}>▦ Save & go to Dashboard</Text>
+    </TouchableOpacity>
+  );
+}
 
 // ===== Step 1 — Look (Layout + Design + Bubble) ============================
 function StepLook({cfg, update}: {cfg: DashboardConfig; update: UP}) {
@@ -128,22 +172,51 @@ function StepLook({cfg, update}: {cfg: DashboardConfig; update: UP}) {
       </View>
 
       <Text style={ui.wizStepTag}>Bubble</Text>
+      <Text style={ui.subLabel}>Floats over every screen — tap to open the dashboard, drag to move. Set Off to use only the toolbar Dashboard button.</Text>
       <View style={ui.snapWrap}>
-        {(['icon', 'label', 'hint'] as BubbleMode[]).map(m => (
-          <Snap key={m} width={130} on={cfg.bubble.mode === m} label={m === 'icon' ? '⊕ only' : m === 'label' ? '⊕ + label' : '⊕ + hint'} onPress={() => update(c => void (c.bubble.mode = m))}>
+        {(['icon', 'label', 'hint', 'off'] as BubbleMode[]).map(m => (
+          <Snap
+            key={m}
+            width={130}
+            on={cfg.bubble.mode === m}
+            label={m === 'icon' ? '⊕ only' : m === 'label' ? '⊕ + label' : m === 'hint' ? '⊕ + hint' : 'Off'}
+            onPress={() => {
+              update(c => void (c.bubble.mode = m));
+              if (m === 'off') DashboardNative.hideBubble?.().catch(() => {});
+            }}>
             <View style={{height: 120, width: 130, alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{fontSize: 34, color: '#000'}}>⊕</Text>
-              {m !== 'icon' && <Text style={{fontSize: 13, fontWeight: '700', color: '#000'}}>Dashboard</Text>}
-              {m === 'hint' && <Text style={{fontSize: 10, color: '#555'}}>1 tap • long-press</Text>}
+              {m === 'off' ? (
+                <Text style={{fontSize: 30, color: '#999999'}}>⊘</Text>
+              ) : (
+                <>
+                  <Text style={{fontSize: 34, color: '#000'}}>⊕</Text>
+                  {m !== 'icon' && <Text style={{fontSize: 13, fontWeight: '700', color: '#000'}}>Dashboard</Text>}
+                  {m === 'hint' && <Text style={{fontSize: 9, color: '#555', textAlign: 'center'}}>Tap to open{'\n'}drag to move</Text>}
+                </>
+              )}
             </View>
           </Snap>
+        ))}
+      </View>
+
+      <Text style={ui.wizStepTag}>Text size (bigger = easier finger taps)</Text>
+      <View style={ui.row}>
+        {(['S', 'M', 'L', 'XL'] as TextScale[]).map(sz => (
+          <TouchableOpacity
+            key={sz}
+            style={[ui.choice, cfg.textScale === sz && ui.choiceOn]}
+            onPress={() => update(c => void (c.textScale = sz))}>
+            <Text style={[ui.choiceText, {fontSize: sz === 'S' ? 13 : sz === 'M' ? 15 : sz === 'L' ? 18 : 22}, cfg.textScale === sz && ui.choiceTextOn]}>
+              {sz}
+            </Text>
+          </TouchableOpacity>
         ))}
       </View>
     </View>
   );
 }
 
-// ===== Step 3 — Sections ===================================================
+// ===== Step 2 — Sections ===================================================
 function StepSections({cfg, update}: {cfg: DashboardConfig; update: UP}) {
   const cols = cfg.layout === 'grid' ? 2 : 1;
   return (
@@ -169,7 +242,7 @@ function StepSections({cfg, update}: {cfg: DashboardConfig; update: UP}) {
       ))}
       <Text style={ui.subLabel}>Add a section</Text>
       <View style={ui.row}>
-        {(['shortcuts', 'stars', 'keywords', 'apps'] as Zone['type'][]).map(t => (
+        {(['shortcuts', 'stars', 'keywords', 'apps', 'recent'] as Zone['type'][]).map(t => (
           <Btn key={t} label={`＋ ${t}`} onPress={() => update(c => c.zones.push(newZone(t)))} small />
         ))}
       </View>
@@ -177,7 +250,7 @@ function StepSections({cfg, update}: {cfg: DashboardConfig; update: UP}) {
   );
 }
 
-// ===== Step 4 — Content ====================================================
+// ===== Step 3 — Content ====================================================
 function StepContent({cfg, update, openModal}: {cfg: DashboardConfig; update: UP; openModal: (m: Modal) => void}) {
   return (
     <View>
@@ -200,7 +273,7 @@ function StepContent({cfg, update, openModal}: {cfg: DashboardConfig; update: UP
         />
       </View>
 
-      {cfg.zones.length === 0 && <Text style={ui.hint}>No section yet — add some in step 3.</Text>}
+      {cfg.zones.length === 0 && <Text style={ui.hint}>No section yet — add some in step 2 (Sections).</Text>}
       {cfg.zones.map((z, i) => (
         <View key={i} style={ui.contentCard}>
           <Text style={ui.zoneRowText}>
@@ -215,29 +288,29 @@ function StepContent({cfg, update, openModal}: {cfg: DashboardConfig; update: UP
             <View>
               <FoldersEditor i={i} folders={z.folders} update={update} openModal={openModal} what="stars" />
               <NoteSortRow i={i} value={z.noteSort ?? 'recent'} update={update} />
+              <Text style={ui.subLabel}>Line preview — show each star's line (slower scan)</Text>
+              <Seg
+                options={[
+                  {v: 'off', label: 'Off'},
+                  {v: 'image', label: 'Image'},
+                  {v: 'text', label: 'Text (OCR, image if it fails)'},
+                ]}
+                value={z.lineMode ?? 'off'}
+                onChange={v => update(c => void ((c.zones[i] as any).lineMode = v))}
+              />
+              <Text style={ui.subLabel}>Allow deleting a star from the dashboard (✕★, keeps the text)</Text>
+              <Seg
+                options={[{v: 'off', label: 'Off'}, {v: 'on', label: 'On'}]}
+                value={z.canDelete ? 'on' : 'off'}
+                onChange={v => update(c => void ((c.zones[i] as any).canDelete = v === 'on'))}
+              />
             </View>
           )}
           {z.type === 'keywords' && <KeywordsEditor i={i} zone={z} update={update} openModal={openModal} />}
           {z.type === 'apps' && <AppsEditor i={i} zone={z} update={update} openModal={openModal} />}
+          {z.type === 'recent' && <RecentEditor i={i} zone={z} update={update} />}
         </View>
       ))}
-    </View>
-  );
-}
-
-// ===== Step 5 — Finish =====================================================
-function StepFinish({cfg, update}: {cfg: DashboardConfig; update: UP}) {
-  return (
-    <View>
-      <Text style={ui.hint}>Your dashboard is saved. What next?</Text>
-      <View style={{gap: 10 as any}}>
-        <Btn label="▦ Go to Dashboard" onPress={() => setRoute('dashboard')} />
-        <Btn label="⊕ Activate Bubble & close" onPress={() => showBubbleFromConfig()} />
-        <Btn
-          label="↺ Reset to defaults"
-          onPress={() => update(c => Object.assign(c, clone(DEFAULT_CONFIG)))}
-        />
-      </View>
     </View>
   );
 }
@@ -251,7 +324,7 @@ function ShortcutsEditor({i, zone, update, openModal}: EditorProps<'shortcuts'>)
       {zone.items.map((it, j) => (
         <View key={j} style={ui.itemRow}>
           <Text style={ui.itemText}>
-            {it.kind === 'folder' ? '📁' : /\.pdf$/i.test(it.path) ? '📕' : '📄'} {it.label}
+            {it.kind === 'folder' ? '📁' : fileKindGlyph(it.path)} {it.label}
           </Text>
           <View style={ui.zoneRowBtns}>
             <Mini label="▲" onPress={() => update(c => moveItem((c.zones[i] as any).items, j, -1))} />
@@ -260,11 +333,29 @@ function ShortcutsEditor({i, zone, update, openModal}: EditorProps<'shortcuts'>)
           </View>
         </View>
       ))}
-      <View style={ui.row}>
-        <Btn label="＋ Folder" onPress={() => openModal({kind: 'browse', allow: 'folder', onPick: p => update(c => (c.zones[i] as any).items.push({kind: 'folder', label: basename(p), path: p}))})} small />
-        <Btn label="＋ Note" onPress={() => openModal({kind: 'browse', allow: 'note', onPick: p => update(c => (c.zones[i] as any).items.push({kind: 'note-last', label: cleanName(p), path: p}))})} small />
-        <Btn label="＋ PDF" onPress={() => openModal({kind: 'browse', allow: 'pdf', onPick: p => update(c => (c.zones[i] as any).items.push({kind: 'note-last', label: cleanName(p), path: p}))})} small />
-      </View>
+      <Text style={ui.subLabel}>Layout</Text>
+      <Seg
+        options={[{v: 'list', label: 'List'}, {v: 'grid', label: 'Grid'}, {v: 'inline', label: 'Inline'}]}
+        value={zone.display ?? 'list'}
+        onChange={v => update(c => void ((c.zones[i] as any).display = v))}
+      />
+      <Btn
+        label="＋ Add folder / note / PDF"
+        small
+        onPress={() =>
+          openModal({
+            kind: 'shortcuts',
+            onDone: picks =>
+              update(c => {
+                const items = (c.zones[i] as any).items;
+                for (const p of picks) {
+                  if (p.kind === 'folder') items.push({kind: 'folder', label: basename(p.path), path: p.path});
+                  else items.push({kind: 'note-last', label: noteTitle(p.path), path: p.path});
+                }
+              }),
+          })
+        }
+      />
     </View>
   );
 }
@@ -285,7 +376,7 @@ function FoldersEditor({i, folders, update, openModal, what}: {i: number; folder
           <Mini label="✕" onPress={() => update(c => void (c.zones[i] as any).folders.splice(j, 1))} />
         </View>
       ))}
-      <Btn label="＋ Folder" onPress={() => openModal({kind: 'browse', allow: 'folder', onPick: p => update(c => {const z = c.zones[i] as any; z.folders = z.folders ?? []; if (!z.folders.includes(p)) z.folders.push(p);})})} small />
+      <Btn label="＋ Folder" onPress={() => openModal({kind: 'browse', onPick: p => update(c => {const z = c.zones[i] as any; z.folders = z.folders ?? []; if (!z.folders.includes(p)) z.folders.push(p);})})} small />
     </View>
   );
 }
@@ -337,6 +428,12 @@ function KeywordsEditor({i, zone, update, openModal}: EditorProps<'keywords'>) {
 function AppsEditor({i, zone, update, openModal}: EditorProps<'apps'>) {
   return (
     <View>
+      <Text style={ui.subLabel}>Layout</Text>
+      <Seg
+        options={[{v: 'inline', label: 'Inline'}, {v: 'grid', label: 'Grid'}, {v: 'list', label: 'List'}]}
+        value={zone.display ?? 'inline'}
+        onChange={v => update(c => void ((c.zones[i] as any).display = v))}
+      />
       {zone.apps.map((a, j) => (
         <View key={j} style={ui.itemRow}>
           <Text style={ui.itemText}>{a.label}</Text>
@@ -497,49 +594,183 @@ function typeIndex(zones: Zone[], i: number): number {
 
 // ===== modals ==============================================================
 function ModalHost({modal, close}: {modal: NonNullable<Modal>; close: () => void}) {
-  if (modal.kind === 'browse') return <PickBrowser allow={modal.allow} onPick={p => {modal.onPick(p); close();}} onClose={close} />;
+  if (modal.kind === 'browse') return <PickBrowser onPick={p => {modal.onPick(p); close();}} onClose={close} />;
+  if (modal.kind === 'shortcuts') return <ShortcutBrowser onDone={p => {modal.onDone(p); close();}} onClose={close} />;
   if (modal.kind === 'apps') return <AppPickerModal onPick={a => {modal.onPick(a); close();}} onClose={close} />;
   if (modal.kind === 'kw') return <KeywordPicker folders={modal.folders} onPick={k => {modal.onPick(k); close();}} onClose={close} />;
-  return <TextPrompt title={modal.title} initial={modal.initial} onSubmit={t => {modal.onSubmit(t); close();}} onClose={close} />;
+  return <ProfilesModal cfg={modal.cfg} onLoad={c => {modal.onLoad(c); close();}} onClose={close} />;
 }
 
-function PickBrowser({allow, onPick, onClose}: {allow: 'folder' | 'note' | 'pdf'; onPick: (p: string) => void; onClose: () => void}) {
-  const ROOT = '/storage/emulated/0'; // navigate anywhere on the device
-  const START = allow === 'pdf' ? ROOT + '/Document' : ROOT + '/Note';
-  const [dir, setDir] = useState(START);
-  const [entries, setEntries] = useState<any[]>([]);
-  const fileRe = allow === 'pdf' ? /\.pdf$/i : /\.note$/i;
-  const load = async (d: string) => {
-    try {
-      const list: any[] = (await DashboardNative.listDir(d)) ?? [];
-      list.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
-      setEntries(list);
-      setDir(d);
-    } catch {
-      setEntries([]);
-    }
+/** Save the current config under a name, or reload a saved one. Guards against
+ *  an accidental Reset wiping a setup you liked. */
+function ProfilesModal({cfg, onLoad, onClose}: {cfg: DashboardConfig; onLoad: (c: DashboardConfig) => void; onClose: () => void}) {
+  const [names, setNames] = useState<string[]>([]);
+  const [newName, setNewName] = useState('');
+  const [status, setStatus] = useState('');
+  const reload = () => listProfiles().then(setNames);
+  useEffect(() => {reload();}, []);
+
+  const doSave = async () => {
+    const n = newName.trim();
+    if (!n) return;
+    await saveProfile(n, cfg);
+    setNewName('');
+    setStatus(`saved “${n}”`);
+    reload();
   };
-  useEffect(() => {load(START);}, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const parent = dir.substring(0, dir.lastIndexOf('/'));
+  const doLoad = async (n: string) => {
+    const c = await loadProfile(n);
+    if (c) onLoad(c);
+  };
+  const doDelete = async (n: string) => {
+    await deleteProfile(n);
+    setStatus(`deleted “${n}”`);
+    reload();
+  };
+
   return (
     <View style={ui.container}>
-      <Text style={ui.wizTitle}>{allow === 'folder' ? 'Pick a folder' : `Pick a ${allow}`}</Text>
+      <View style={ui.header}>
+        <Text style={ui.wizTitle}>Save / load configuration</Text>
+        <TouchableOpacity style={ui.iconBtn} onPress={onClose}>
+          <Text style={ui.iconText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={ui.hint}>Save the current dashboard under a name, then reload it anytime (e.g. after a Reset).</Text>
+
+      <Text style={ui.subLabel}>Save current as…</Text>
       <View style={ui.row}>
-        <Btn label="⬆" onPress={() => load(parent || ROOT)} disabled={dir === ROOT} small />
+        <TextInput
+          style={[ui.titleInput, {flex: 1, minWidth: 160}]}
+          value={newName}
+          placeholder="profile name"
+          placeholderTextColor="#999999"
+          onChangeText={setNewName}
+          onSubmitEditing={doSave}
+          returnKeyType="done"
+        />
+        <Btn label="Save" onPress={doSave} small />
+      </View>
+
+      <Text style={ui.subLabel}>Saved profiles</Text>
+      {names.length === 0 && <Text style={ui.empty}>(none yet)</Text>}
+      <ScrollView style={ui.pickerFull}>
+        {names.map(n => (
+          <View key={n} style={ui.pickerRow}>
+            <Text style={ui.pickerRowText}>{n}</Text>
+            <View style={ui.zoneRowBtns}>
+              <Mini label="Load" onPress={() => doLoad(n)} />
+              <Mini label="✕" onPress={() => doDelete(n)} />
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+      {status ? <Text style={ui.status}>{status}</Text> : null}
+    </View>
+  );
+}
+
+const STORAGE_ROOT = '/storage/emulated/0';
+const NOTE_START = STORAGE_ROOT + '/Note';
+
+async function listDirSorted(d: string): Promise<any[]> {
+  try {
+    const list: any[] = (await DashboardNative.listDir(d)) ?? [];
+    list.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
+    return list;
+  } catch {
+    return [];
+  }
+}
+const isNoteOrPdf = (name: string) => /\.(note|pdf)$/i.test(name);
+const fileGlyph = (name: string) => (/\.pdf$/i.test(name) ? '📕 ' : /\.note$/i.test(name) ? '📄 ' : '   ');
+
+/** Shared directory-navigation state for the two browser modals. */
+function useDirBrowser() {
+  const [dir, setDir] = useState(NOTE_START);
+  const [entries, setEntries] = useState<any[]>([]);
+  const load = async (d: string) => {setEntries(await listDirSorted(d)); setDir(d);};
+  useEffect(() => {load(NOTE_START);}, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const parent = dir.substring(0, dir.lastIndexOf('/'));
+  const up = () => load(parent || STORAGE_ROOT);
+  return {dir, entries, load, up, atRoot: dir === STORAGE_ROOT};
+}
+
+/** Pick ONE folder (used for scan scope). Full-page. */
+function PickBrowser({onPick, onClose}: {onPick: (p: string) => void; onClose: () => void}) {
+  const {dir, entries, load, up, atRoot} = useDirBrowser();
+  return (
+    <View style={ui.container}>
+      <Text style={ui.wizTitle}>Pick a folder</Text>
+      <View style={ui.row}>
+        <Btn label="⬆" onPress={up} disabled={atRoot} small />
         <Btn label="✕ cancel" onPress={onClose} small />
-        {allow === 'folder' && <Btn label="✓ use this folder" onPress={() => onPick(dir)} small />}
+        <Btn label="✓ use this folder" onPress={() => onPick(dir)} small />
       </View>
       <Text style={ui.zoneMeta}>{dir}</Text>
-      <ScrollView style={ui.picker}>
+      <ScrollView style={ui.pickerFull}>
+        {entries.map((e, i) => (
+          <TouchableOpacity key={i} onPress={() => e.isDir && load(e.path)}>
+            <Text style={[ui.pickerItem, !e.isDir && {color: '#aaa'}]}>
+              {e.isDir ? '📁 ' : fileGlyph(e.name)}
+              {e.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Multi-select browser for shortcuts. Navigate anywhere; tap notes/PDFs to
+ * (de)select, tap ＋ to add a folder, then Save adds them all at once.
+ */
+function ShortcutBrowser({onDone, onClose}: {onDone: (picks: Pick[]) => void; onClose: () => void}) {
+  const {dir, entries, load, up, atRoot} = useDirBrowser();
+  const [picks, setPicks] = useState<Pick[]>([]);
+  const has = (path: string) => picks.some(p => p.path === path);
+  const toggle = (kind: 'folder' | 'file', path: string) =>
+    setPicks(ps => (ps.some(p => p.path === path) ? ps.filter(p => p.path !== path) : [...ps, {kind, path}]));
+
+  return (
+    <View style={ui.container}>
+      <View style={ui.header}>
+        <Text style={ui.wizTitle}>Add shortcuts</Text>
+        <View style={ui.headerBtns}>
+          <TouchableOpacity style={ui.navBtn} onPress={onClose}>
+            <Text style={ui.navBtnText}>✕ Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[ui.navBtn, ui.navBtnPri, {marginLeft: 8}]} onPress={() => onDone(picks)}>
+            <Text style={[ui.navBtnText, ui.navBtnTextPri]}>Save ({picks.length})</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <View style={ui.row}>
+        <Btn label="⬆" onPress={up} disabled={atRoot} small />
+        <Btn label={has(dir) ? '✓ this folder added' : '＋ Add this folder'} onPress={() => toggle('folder', dir)} small />
+      </View>
+      <Text style={ui.zoneMeta}>{dir}</Text>
+      <ScrollView style={ui.pickerFull}>
         {entries.map((e, i) => {
-          const pickable = allow !== 'folder' && fileRe.test(e.name);
+          const selectable = !e.isDir && isNoteOrPdf(e.name);
+          const selected = has(e.path);
           return (
-            <TouchableOpacity key={i} onPress={() => (e.isDir ? load(e.path) : pickable ? onPick(e.path) : undefined)}>
-              <Text style={[ui.pickerItem, !e.isDir && !pickable && {color: '#aaa'}]}>
-                {e.isDir ? '📁 ' : /\.pdf$/i.test(e.name) ? '📕 ' : /\.note$/i.test(e.name) ? '📄 ' : '   '}
-                {e.name}
-              </Text>
-            </TouchableOpacity>
+            <View key={i} style={[ui.pickerRow, selected && ui.pickerRowSel]}>
+              <TouchableOpacity
+                style={{flex: 1}}
+                onPress={() => (e.isDir ? load(e.path) : selectable ? toggle('file', e.path) : undefined)}>
+                <Text style={[ui.pickerRowText, !e.isDir && !selectable && {color: '#aaa'}]}>
+                  {selected ? '✓ ' : e.isDir ? '📁 ' : fileGlyph(e.name)}
+                  {e.name}
+                </Text>
+              </TouchableOpacity>
+              {e.isDir && (
+                <TouchableOpacity style={ui.pickerAdd} onPress={() => toggle('folder', e.path)}>
+                  <Text style={ui.miniBtnText}>{selected ? '✓' : '＋'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           );
         })}
       </ScrollView>
@@ -568,7 +799,7 @@ function AppPickerModal({onPick, onClose}: {onPick: (a: {label: string; componen
         <Btn label="✕ cancel" onPress={onClose} small />
         {!all && <Btn label="Show all apps" onPress={showAll} small />}
       </View>
-      <ScrollView style={ui.picker}>
+      <ScrollView style={ui.pickerFull}>
         <Text style={ui.subLabel}>Supernote apps</Text>
         {CURATED_APPS.map((a, i) => (
           <TouchableOpacity key={i} onPress={() => onPick(a)}>
@@ -589,7 +820,7 @@ function AppPickerModal({onPick, onClose}: {onPick: (a: {label: string; componen
 function KeywordPicker({folders, onPick, onClose}: {folders: string[]; onPick: (k: string) => void; onClose: () => void}) {
   const [kws, setKws] = useState<string[] | null>(null);
   useEffect(() => {
-    scanKeywords(folders, undefined)
+    scanKeywords(folders)
       .then(r => setKws([...new Set(r.hits.map(h => h.keyword))].sort()))
       .catch(() => setKws([]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -598,7 +829,7 @@ function KeywordPicker({folders, onPick, onClose}: {folders: string[]; onPick: (
       <Text style={ui.wizTitle}>Pick a keyword</Text>
       <Btn label="✕ cancel" onPress={onClose} small />
       {!kws && <Text style={ui.hint}>scanning…</Text>}
-      <ScrollView style={ui.picker}>
+      <ScrollView style={ui.pickerFull}>
         {kws?.length === 0 && <Text style={ui.empty}>No keyword found in these folders.</Text>}
         {kws?.map((k, i) => (
           <TouchableOpacity key={i} onPress={() => onPick(k)}>
@@ -606,20 +837,6 @@ function KeywordPicker({folders, onPick, onClose}: {folders: string[]; onPick: (
           </TouchableOpacity>
         ))}
       </ScrollView>
-    </View>
-  );
-}
-
-function TextPrompt({title, initial, onSubmit, onClose}: {title: string; initial: string; onSubmit: (t: string) => void; onClose: () => void}) {
-  const [t, setT] = useState(initial);
-  return (
-    <View style={ui.container}>
-      <Text style={ui.wizTitle}>{title}</Text>
-      <TextInput style={[ui.json, {minHeight: 44, flex: 0}]} value={t} onChangeText={setT} autoCapitalize="none" autoCorrect={false} />
-      <View style={ui.row}>
-        <Btn label="OK" onPress={() => onSubmit(t.trim())} small />
-        <Btn label="Cancel" onPress={onClose} small />
-      </View>
     </View>
   );
 }
@@ -634,12 +851,29 @@ function moveItem(arr: any[], i: number, dir: number) {
   const [x] = arr.splice(i, 1);
   arr.splice(j, 0, x);
 }
+function RecentEditor({i, zone, update}: {i: number; zone: Extract<Zone, {type: 'recent'}>; update: UP}) {
+  return (
+    <View>
+      <Text style={ui.subLabel}>How many (Supernote only tracks the last {RECENT_MAX} opened — {RECENT_MAX} max)</Text>
+      <Seg
+        options={[{v: '3', label: '3'}, {v: '5', label: '5'}, {v: String(RECENT_MAX), label: String(RECENT_MAX)}]}
+        value={String(zone.count ?? RECENT_MAX)}
+        onChange={v => update(c => void ((c.zones[i] as any).count = Number(v)))}
+      />
+      <Text style={ui.subLabel}>Layout</Text>
+      <Seg
+        options={[{v: 'list', label: 'List'}, {v: 'grid', label: 'Grid'}, {v: 'inline', label: 'Inline'}]}
+        value={zone.display ?? 'list'}
+        onChange={v => update(c => void ((c.zones[i] as any).display = v))}
+      />
+    </View>
+  );
+}
+
 function newZone(type: Zone['type']): Zone {
   if (type === 'shortcuts') return {type, title: 'Shortcuts', items: []};
   if (type === 'stars') return {type, title: 'Stars', folders: [], noteSort: 'recent'};
   if (type === 'keywords') return {type, title: 'Keywords', folders: [], sort: 'keyword', display: 'list', noteSort: 'recent'};
+  if (type === 'recent') return {type, title: 'Recent', count: RECENT_MAX, display: 'list'};
   return {type: 'apps', title: 'Apps', apps: []};
-}
-function cleanName(path: string): string {
-  return basename(path).replace(/\.(note|pdf)$/i, '');
 }
