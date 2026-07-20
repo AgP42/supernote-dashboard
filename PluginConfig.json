@@ -4,8 +4,8 @@
   "pluginID": "dsh4b0ardplg9x2k",
   "jsMainPath": "index",
   "iconPath": "assets/icon.png",
-  "desc": "Configurable dashboard: shortcuts, stars, keywords and app launchers, reachable from a floating bubble.",
+  "desc": "Configurable dashboard: shortcuts, recent, stars, keywords and app launchers, reached from a floating bubble. IMPORTANT: before uninstalling, set the bubble to Off in the plugin (Settings > Look) so it doesn't linger \u2014 if you forget, just restart the device to clear it.",
   "author": "AgP42",
-  "versionName": "0.9.3",
-  "versionCode": "14"
+  "versionName": "0.21.6",
+  "versionCode": "52"
 }
