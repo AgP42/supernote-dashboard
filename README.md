@@ -3,6 +3,10 @@
 A configurable, always‑available dashboard for Supernote e‑ink devices. Its face is a draggable
 **bubble** (⊕) that floats over everything; tap it to open the dashboard, drag it to move it.
 
+![Dashboard demo](docs/dashboard-demo.gif)
+
+▶ [Full walkthrough (MP4)](docs/dashboard-demo.mp4) · 📖 [User Guide](USER_GUIDE.md) · ⬇ [Latest release](../../releases/latest)
+
 Capabilities validated on A5X + Manta are written up in the public repo's `docs/FINDINGS.md` and the
 `supernote-plugin-dev` skill under `.claude/skills/`.
 
